@@ -15,5 +15,5 @@
 
 
 <p align="center">
-  <img src="figures/urban_sim.png" alt="Urban-Sim Teaser" width="100%">
+  <img src="urban_sim.png" alt="Urban-Sim Teaser" width="100%">
 </p>
