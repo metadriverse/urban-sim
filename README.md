@@ -14,3 +14,8 @@
 
 
 [urban_sim_v1.pdf](https://github.com/user-attachments/files/20007187/urban_sim_v1.pdf)
+
+
+<p align="center">
+  <img src="figures/urban_sim.png" alt="Urban-Sim Teaser" width="100%">
+</p>
