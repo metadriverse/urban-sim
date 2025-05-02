@@ -11,3 +11,6 @@
 </div>
 
 🚀 **URBAN-SIM** will be released before CVPR 2025. Please stay tuned!
+
+
+[urban_sim_v1.pdf](https://github.com/user-attachments/files/20007187/urban_sim_v1.pdf)
