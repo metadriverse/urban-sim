@@ -233,6 +233,14 @@ while [[ $# -gt 0 ]]; do
             ${python_exe} -m pip install -e ${URBANSIM_PATH}/isaac_source/isaaclab_rl["${framework_name}"]
             ${python_exe} -m pip install -e ${URBANSIM_PATH}/isaac_source/isaaclab_mimic["${framework_name}"]
 
+            # install urbansim
+            echo "[INFO] Installing URBAN-SIM..."
+            ${python_exe} -m pip install -e .
+
+            # install rl games with additional functions
+            echo "[INFO] Installing rl-games with additional functions..."
+            ${python_exe} -m pip install -e .
+
             # update the vscode settings
             update_vscode_settings
 
