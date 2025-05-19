@@ -98,173 +98,32 @@ class UniformPose2dCommand(CommandTerm):
         self.metrics["error_heading"] = torch.abs(wrap_to_pi(self.heading_command_w - self.robot.data.heading_w))
 
     def _resample_command(self, env_ids: Sequence[int]):
-        self.use_ref_path = False
-        self.generated = False
-        self.generating_demo_data = True
-        if False:#self.use_ref_path and not self.generated:
-            print('[INFO] Using ref path to provide dense reward')
-            
-            physx = omni.physx.acquire_physx_interface()
-            stage_id = omni.usd.get_context().get_stage_id()
-            generator = _omap.Generator(physx, stage_id)
-            generator.update_settings(.05, 4, 5, 6)
-            
-            self.output_list = []
-            env = self._env
-            for idx in range(env.num_envs):
-                origin = env.scene.env_origins[idx].cpu().numpy()[..., :2].reshape(2,)
-                generator.set_transform((15 + origin[0], 15 + origin[1], 0), (-15, -15, 0.1), (15, 15, 1.5))
-                generator.generate2d()
-                points = generator.get_occupied_positions()
-                buffer = np.array(generator.get_buffer(), dtype=np.uint8)
-                h, w = int(30 // 0.05), int(30 // 0.05)  # 地图尺寸
-                buffer_2d = buffer.reshape((h, w))
+        self.pos_command_w[env_ids] = self._env.scene.env_origins[env_ids]
+        # offset the position command by the current root position
+        r = torch.empty(len(env_ids), device=self.device)
+        self.pos_command_w[env_ids, 0] += r.uniform_(*self.cfg.ranges.pos_x)
+        self.pos_command_w[env_ids, 1] += r.uniform_(*self.cfg.ranges.pos_y)
+        self.pos_command_w[env_ids, 2] += self.robot.data.default_root_state[env_ids, 2]
+        if self.cfg.simple_heading:
+            # set heading command to point towards target
+            target_vec = self.pos_command_w[env_ids] - self.robot.data.root_pos_w[env_ids]
+            target_direction = torch.atan2(target_vec[:, 1], target_vec[:, 0])
+            flipped_target_direction = wrap_to_pi(target_direction + torch.pi)
 
-                occupied_mask = (buffer_2d == 4).astype(np.uint8) * 255  # 4 → 255，其它 → 0
+            # compute errors to find the closest direction to the current heading
+            # this is done to avoid the discontinuity at the -pi/pi boundary
+            curr_to_target = wrap_to_pi(target_direction - self.robot.data.heading_w[env_ids]).abs()
+            curr_to_flipped_target = wrap_to_pi(flipped_target_direction - self.robot.data.heading_w[env_ids]).abs()
 
-                kernel = np.ones((25, 25), dtype=np.uint8)
-                dilated = cv2.dilate(occupied_mask, kernel, iterations=1)
-
-                updated = (buffer_2d != 4) & (dilated > 0)
-                buffer_2d[updated] = 4
-                w = int(30 // 0.05)
-                h = int(30 // 0.05)
-                mask = np.array(buffer_2d, dtype=np.uint8).reshape((h, w))
-                img = np.zeros((h, w, 3), dtype=np.uint8)
-
-                img[mask == 4] = [0, 0, 0]       # occupied - black
-                img[mask == 5] = [255, 255, 255] # free - white
-                img[mask == 6] = [128, 128, 128] # unknown - gray
-                img = cv2.flip(img, 0)  # flip the image vertically
-                img = cv2.flip(img, 1) 
-                # img = img.transpose(1, 0, 2)
-                
-                world_start = np.array([2, 15]).reshape(1, 2)
-                u = (world_start[:, 0] - 0) / 30
-                v = 1.0 - (world_start[:, 1] - 0) / 30
-                x_px = u * 30 // 0.05
-                y_px = v * 30 // 0.05
-                start = np.array([y_px, x_px]).astype(int).reshape(2,)  # [x, y]
-                # start = np.array([x_px, y_px]).astype(int).reshape(2,)                
-                output = generate_paths(start,(img[..., 0] == 255).astype(np.uint8))
-                self.output_list.append(output)
-                
-            self.generated = True
-        if self.generating_demo_data and hasattr(self._env, 'ref_path'):
-            return   
-        elif self.use_ref_path:
-            if not hasattr(self._env, 'ref_path'):
-                self._env.ref_path = [[] for _ in range(self._env.scene.num_envs)]
-            env_ids_for_sampling = env_ids.cpu().numpy().reshape(len(env_ids), ).tolist()
-            for env_id in env_ids_for_sampling:
-                stop_sampling = False
-                while not stop_sampling:
-                    end = output.sample_random_end_point()
-                    path = output.unroll_path(end)
-                    path = path[:, ::-1]
-                    u = path[:, 0] / (30 // 0.05)
-                    v = 1.0 - path[:, 1] / (30 // 0.05)
-                    x_world = u * 30.
-                    y_world = v * 30.
-                
-                    #valid = (mask[path[:, 0], path[:, 1]] > 0).all()
-                    try:
-                        if True:# abs(y_world[1] - y_world[0]) < 0.01 and x_world[1] - x_world[0] > 0.01:
-                            stop_sampling = True
-                            x_world = [1.0, 2.0, 3.0] + x_world.tolist()
-                            y_world = [15., 15., 15.] + y_world.tolist()
-                    except:
-                        continue
-                self.pos_command_w[env_id, 0] = self._env.scene.env_origins[env_id, 0] + x_world[-1]
-                self.pos_command_w[env_id, 1] = self._env.scene.env_origins[env_id, 1] + y_world[-1]
-                self.pos_command_w[env_id, 2] = self._env.scene.env_origins[env_id, 2] + self.robot.data.default_root_state[env_id, 2]
-                self._env.ref_path[env_id] = torch.cat([torch.tensor([x_world], device=self.device).reshape(-1, 1), torch.tensor([y_world], device=self.device).reshape(-1, 1)], dim=1)
-          
-        if True:
-            self.pos_command_w[env_ids] = self._env.scene.env_origins[env_ids]
-            # offset the position command by the current root position
-            r = torch.empty(len(env_ids), device=self.device)
-            self.pos_command_w[env_ids, 0] += r.uniform_(*self.cfg.ranges.pos_x)
-            self.pos_command_w[env_ids, 1] += r.uniform_(*self.cfg.ranges.pos_y)
-            self.pos_command_w[env_ids, 2] += self.robot.data.default_root_state[env_ids, 2]  
-        elif not self.use_ref_path:      
-            sampling_times = 0
-            suceess_env_sub_ids = []
-            # positions_of_assets = self._env.scene.asset_position[env_ids].reshape(len(env_ids), -1, 2)
-            while sampling_times <= 200:
-                # obtain env origins for the environments
-                # self.pos_command_w[env_ids] = self._env.scene.env_origins[env_ids]
-                # # offset the position command by the current root position
-                # r = torch.empty(len(env_ids), device=self.device)
-                # self.pos_command_w[env_ids, 0] += r.uniform_(*self.cfg.ranges.pos_x)
-                # self.pos_command_w[env_ids, 1] += r.uniform_(*self.cfg.ranges.pos_y)
-                # self.pos_command_w[env_ids, 2] += self.robot.data.default_root_state[env_ids, 2]
-                
-                env_ids_to_be_checked = [id_ for id_ in env_ids if id_ not in suceess_env_sub_ids]
-                if len(env_ids_to_be_checked) == 0:
-                    break
-                env_ids_to_be_checked = torch.tensor(env_ids_to_be_checked).reshape(len(env_ids_to_be_checked), )
-                positions_of_assets = self._env.scene.asset_position[env_ids_to_be_checked].reshape(len(env_ids_to_be_checked), -1, 2)
-                self.pos_command_w[env_ids_to_be_checked] = self._env.scene.env_origins[env_ids_to_be_checked]
-                # offset the position command by the current root position
-                r = torch.empty(len(env_ids_to_be_checked), device=self.device)
-                self.pos_command_w[env_ids_to_be_checked, 0] += r.uniform_(*self.cfg.ranges.pos_x)
-                self.pos_command_w[env_ids_to_be_checked, 1] += r.uniform_(*self.cfg.ranges.pos_y)
-                self.pos_command_w[env_ids_to_be_checked, 2] += self.robot.data.default_root_state[env_ids_to_be_checked, 2]
-                
-                distance_to_asset = self.pos_command_w[env_ids_to_be_checked, 0:2].reshape(-1, 1, 2) - positions_of_assets - self._env.scene.env_origins[env_ids_to_be_checked][..., :2].reshape(-1, 1, 2)
-                distance_to_asset = torch.min(torch.linalg.norm(distance_to_asset, dim=-1), dim=1).values
-                valid_pos = distance_to_asset > 1.5
-                valid_pos = valid_pos.reshape(len(env_ids_to_be_checked), ).cpu().numpy().tolist()
-                for idx, p in enumerate(valid_pos):
-                    if bool(p):
-                        suceess_env_sub_ids.append(env_ids_to_be_checked[idx])
-                
-                sampling_times += 1
-                if sampling_times == 50:
-                    print('[INFO] Sampling steps -> max step')
-                
-                # if self.cfg.simple_heading:
-                #     # set heading command to point towards target
-                #     target_vec = self.pos_command_w[env_ids] - self.robot.data.root_pos_w[env_ids]
-                #     target_direction = torch.atan2(target_vec[:, 1], target_vec[:, 0])
-                #     flipped_target_direction = wrap_to_pi(target_direction + torch.pi)
-
-                #     # compute errors to find the closest direction to the current heading
-                #     # this is done to avoid the discontinuity at the -pi/pi boundary
-                #     curr_to_target = wrap_to_pi(target_direction - self.robot.data.heading_w[env_ids]).abs()
-                #     curr_to_flipped_target = wrap_to_pi(flipped_target_direction - self.robot.data.heading_w[env_ids]).abs()
-
-                #     # set the heading command to the closest direction
-                #     self.heading_command_w[env_ids] = torch.where(
-                #         curr_to_target < curr_to_flipped_target,
-                #         target_direction,
-                #         flipped_target_direction,
-                #     )
-                # else:
-                #     # random heading command
-                #     self.heading_command_w[env_ids] = r.uniform_(*self.cfg.ranges.heading)
-                
-                if self.cfg.simple_heading:
-                    # set heading command to point towards target
-                    target_vec = self.pos_command_w[env_ids_to_be_checked] - self.robot.data.root_pos_w[env_ids_to_be_checked]
-                    target_direction = torch.atan2(target_vec[:, 1], target_vec[:, 0])
-                    flipped_target_direction = wrap_to_pi(target_direction + torch.pi)
-
-                    # compute errors to find the closest direction to the current heading
-                    # this is done to avoid the discontinuity at the -pi/pi boundary
-                    curr_to_target = wrap_to_pi(target_direction - self.robot.data.heading_w[env_ids_to_be_checked]).abs()
-                    curr_to_flipped_target = wrap_to_pi(flipped_target_direction - self.robot.data.heading_w[env_ids_to_be_checked]).abs()
-
-                    # set the heading command to the closest direction
-                    self.heading_command_w[env_ids_to_be_checked] = torch.where(
-                        curr_to_target < curr_to_flipped_target,
-                        target_direction,
-                        flipped_target_direction,
-                    )
-                else:
-                    # random heading command
-                    self.heading_command_w[env_ids_to_be_checked] = r.uniform_(*self.cfg.ranges.heading)
+            # set the heading command to the closest direction
+            self.heading_command_w[env_ids] = torch.where(
+                curr_to_target < curr_to_flipped_target,
+                target_direction,
+                flipped_target_direction,
+            )
+        else:
+            # random heading command
+            self.heading_command_w[env_ids] = r.uniform_(*self.cfg.ranges.heading)
 
     def _update_command(self):
         """Re-target the position command to the current root state."""

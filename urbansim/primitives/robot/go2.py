@@ -3,7 +3,7 @@
 # Author: Honglin He
 # SPDX-License-Identifier: BSD-3-Clause
 # Acknowledgment:
-# The template is from IsaacLab: https://github.com/isaac-sim/IsaacLab
+# The robot is from IsaacLab: https://github.com/isaac-sim/IsaacLab
 # We thank the IsaacLab team for their contributions.
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ from isaaclab.envs import ManagerBasedRLEnv
 
 from isaaclab_assets.robots.unitree import UNITREE_GO2_CFG
 UNITREE_GO2_CFG.init_state.pos = (0.0, 0.0, 0.3)
+from urbansim.primitives.locomotion.mixed_type import ObservationsCfg as loc_ObservationsCfg
 
 # ============================
 # Locomotion
@@ -126,7 +127,7 @@ class GO2NavActionsCfg:
         policy_path=f"assets/ckpts/locomotion/unitree_go2/general.pt",
         low_level_decimation=4,
         low_level_actions=mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*"], scale=0.25, use_default_offset=True),
-        low_level_observations=flat_ObservationsCfg.PolicyCfg(),
+        low_level_observations=loc_ObservationsCfg.PolicyCfg(),
         debug_vis=False,
         align_heading_with_velocity=True,
     )
