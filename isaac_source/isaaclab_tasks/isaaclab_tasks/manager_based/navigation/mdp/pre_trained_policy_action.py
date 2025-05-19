@@ -67,6 +67,10 @@ class PreTrainedPolicyAction(ActionTerm):
         self._low_level_obs_manager = ObservationManager({"ll_policy": cfg.low_level_observations}, env)
 
         self._counter = 0
+        
+        self.align_heading_with_velocity = cfg.align_heading_with_velocity
+        if self.align_heading_with_velocity:
+            print('[INFO] Aligning heading with velocity.')
 
     """
     Properties.
@@ -89,28 +93,11 @@ class PreTrainedPolicyAction(ActionTerm):
     """
 
     def process_actions(self, actions: torch.Tensor):
-        # DT = 0.02
-        # MAX_W = 2.0
-        # MAX_V = 2.0
-        # def pd_controller(waypoint):
-        #     dx = waypoint[:, 0]
-        #     dy = waypoint[:, 1]
-        #     v = dx / DT
-        #     w = torch.arctan2(dy, dx) / DT
-        #     v = torch.clip(v, 0, MAX_V)
-        #     w = torch.clip(w, -MAX_W, MAX_W)
-        #     return v, w
-        # actions = actions * 2 / 50
-        # v, w = pd_controller(actions)
-        # eps = 1e-6
-        # R = torch.where(torch.abs(w) > eps, v / (w + eps), 1e6 * torch.ones_like(v)) 
-        # steering_angle = torch.arctan(1.5 / R)
-        # action = torch.stack([v * torch.cos(steering_angle), v * torch.sin(steering_angle), steering_angle], dim=1).float().reshape(-1, 3)
         self._raw_actions[:] = actions
-        # self._raw_actions[:] = actions
 
     def apply_actions(self):
-        self._raw_actions[:, 2] = torch.arctan2(self._raw_actions[:, 1], self._raw_actions[:, 0])
+        if self.align_heading_with_velocity:
+            self._raw_actions[:, 2] = torch.arctan2(self._raw_actions[:, 1], self._raw_actions[:, 0])
         if self._counter % self.cfg.low_level_decimation == 0:
             low_level_obs = self._low_level_obs_manager.compute_group("ll_policy")
             self.low_level_actions[:] = self.policy(low_level_obs)
@@ -206,3 +193,5 @@ class PreTrainedPolicyActionCfg(ActionTermCfg):
     """Low level observation configuration."""
     debug_vis: bool = True
     """Whether to visualize debug information. Defaults to False."""
+    align_heading_with_velocity: bool = False
+    """Whether to align the heading of the robot with the velocity. Defaults to False."""

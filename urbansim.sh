@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-# Copyright (c) 2025-2030, Honglin He from Zhou Lab @ UCLA.
+# Copyright (c) 2025-2030, UrbanSim Project Developers from Zhou Lab @ UCLA.
 # All rights reserved.
-#
+# Author: Honglin He
 # SPDX-License-Identifier: BSD-3-Clause
 # Acknowledgment:
-# The template is from IsaacLab: https://github.com/isaac-sim/IsaacLab/blob/main/isaaclab.sh.
+# The template is from IsaacLab: https://github.com/isaac-sim/IsaacLab
 # We thank the IsaacLab team for their contributions.
 
 #==
@@ -69,7 +69,7 @@ setup_conda_env() {
     printf '%s\n' '#!/usr/bin/env bash' '' \
         '# for URBAN-SIM' \
         'export URBANSIM_PATH='${URBANSIM_PATH}'' \
-        'alias urbansim='${URBANSIM_PATH}'/isaaclab.sh' \
+        'alias urbansim='${URBANSIM_PATH}'/urbansim.sh' \
         '' \
         '# show icon if not runninng headless' \
         'export RESOURCE_NAME="IsaacSim"' \
@@ -94,7 +94,7 @@ setup_conda_env() {
     # remove variables from environment during deactivation
     printf '%s\n' '#!/usr/bin/env bash' '' \
         '# for URBAN-SIM' \
-        'unalias isaaclab &>/dev/null' \
+        'unalias urbansim &>/dev/null' \
         'unset URBANSIM_PATH' \
         '' \
         '# restore paths' \
@@ -267,6 +267,15 @@ while [[ $# -gt 0 ]]; do
             # update the vscode settings
             update_vscode_settings
             shift # past argument
+            # exit neatly
+            break
+            ;;
+        -p|--python)
+            # run the python provided by isaacsim
+            python_exe=$(extract_python_exe)
+            echo "[INFO] Using python from: ${python_exe}"
+            shift # past argument
+            ${python_exe} "$@"
             # exit neatly
             break
             ;;

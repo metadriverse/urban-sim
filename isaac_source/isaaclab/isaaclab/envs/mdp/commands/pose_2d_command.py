@@ -29,10 +29,6 @@ import cv2
 import pytest
 import numpy as np
 
-import mobility_gen_path_planner._mobility_gen_path_planner_C as _C
-
-from mobility_gen_path_planner import generate_paths
-
 class UniformPose2dCommand(CommandTerm):
     """Command generator that generates pose commands containing a 3-D position and heading.
 
