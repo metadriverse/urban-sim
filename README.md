@@ -50,7 +50,7 @@ git clone -b main --depth 1 TODO
 cd TODO
 
 # Install Isaacsim
-TODO
+missref
 
 # Create a new conda environment and install required libraries
 bash urbansim.sh -c [env_name]  # The default name is "urbansim"
