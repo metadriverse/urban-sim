@@ -220,7 +220,7 @@ class UrbanScene(InteractiveScene):
         # unique dynamic assets
         self.unique_dynamic_asset_path = []
         if self.cfg.dynamic_assets_path is None:
-            self.cfg.dynamic_assets_path = f"{URBANSIM_PATH}/peds/"
+            self.cfg.dynamic_assets_path = f"{URBANSIM_PATH}/assets/peds/"
             print(f'[INFO] dynamic_assets_path: {self.cfg.dynamic_assets_path}')
         all_assets = os.listdir(self.cfg.dynamic_assets_path)
         self.unique_dynamic_asset_path = [os.path.join(self.cfg.dynamic_assets_path, asset, asset.split('_')[-1] + '.usd') for asset in all_assets]
