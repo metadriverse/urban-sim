@@ -40,7 +40,6 @@ class SceneCfg(UrbanSceneCfg):
 @configclass
 class CommandsCfg:
     """Command specifications for the MDP."""
-
     pass
 
 
@@ -55,8 +54,19 @@ class ActionsCfg:
 class ObservationsCfg:
     """Observation specifications for the MDP."""
 
-    pass
-
+    @configclass
+    class PolicyCfg(ObsGroup):
+        """Observations for policy group."""
+        # observation terms (order preserved)
+        pose_command = ObsTerm(func=loc_mdp.generated_commands, params={"command_name": "pose_command"})
+        
+    @configclass
+    class SensorCfg(ObsGroup):
+        rgb = ObsTerm(func=nav_mdp.image_processed, params={"sensor_cfg": SceneEntityCfg("camera")})
+    
+    # observation groups
+    policy: PolicyCfg = PolicyCfg()
+    sensor: SensorCfg = SensorCfg()
 
 @configclass
 class EventCfg:
@@ -71,14 +81,19 @@ class RewardsCfg:
     """Reward terms for the MDP."""
 
     # -- task
-    pass
+    termination_penalty = RewTerm(func=loc_mdp.is_terminated, weight=-100.0)
+    position_tracking = RewTerm(
+        func=nav_mdp.position_command_error_tanh,
+        weight=1.0,
+        params={"std": 2.0, "command_name": "pose_command"},
+    )
 
 
 @configclass
 class TerminationsCfg:
     """Termination terms for the MDP."""
 
-    pass
+    time_out = DoneTerm(func=loc_mdp.time_out, time_out=False)
 
 
 @configclass
