@@ -164,8 +164,6 @@ class BaseUrbanSceneCfg(UrbanSceneCfg):
             #intensity=750.0,
             texture_file=f"{ISAAC_NUCLEUS_DIR}/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr",
             intensity=750.0,
-            #color=(0.75, 0.75, 0.75),
-            # visible_in_primary_ray=False,
         ),
     )
 
@@ -175,7 +173,7 @@ Define the Environment
 """
 @configclass
 class BaseEnvCfg(ManagerBasedRLEnvCfg):
-    scene = BaseUrbanSceneCfg(num_envs=4, env_spacing=2.0)
+    scene = BaseUrbanSceneCfg(num_envs=args_cli.num_envs, env_spacing=2.0)
     
     observations = ObservationsCfg()
     actions = COCOVelocityActionsCfg()

@@ -28,6 +28,7 @@ from isaaclab.assets.articulation import ArticulationCfg
 from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR
 from isaaclab.actuators import ImplicitActuatorCfg, DelayedPDActuatorCfg
 from isaaclab.envs import ManagerBasedRLEnv
+from urbansim.primitives.locomotion.general import ObservationsCfg as loc_ObservationsCfg
 
 from isaaclab_assets.robots.anymal import ANYMAL_C_CFG
 ANYMAL_C_CFG.init_state.pos = (0.0, 0.0, 0.5)
@@ -54,7 +55,15 @@ def AnymalCRoughModifyEnv(env):
 @configclass
 class AnymalCNavActionsCfg:
     """Action specifications for the MDP."""
-    pass
+    pre_trained_policy_action: nmdp.PreTrainedPolicyActionCfg = nmdp.PreTrainedPolicyActionCfg(
+        asset_name="robot",
+        policy_path=f"assets/ckpts/locomotion/anymal_C/general.pt",
+        low_level_decimation=4,
+        low_level_actions=mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*"], scale=0.5, use_default_offset=True),
+        low_level_observations=loc_ObservationsCfg.PolicyCfg(),
+        debug_vis=False,
+        align_heading_with_velocity=False,
+    )
 
 # ============================
 # Trainig Config
