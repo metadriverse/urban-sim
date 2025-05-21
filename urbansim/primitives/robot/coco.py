@@ -352,7 +352,7 @@ def COCONavModifyEnv(env):
     env.scene.height_scanner.prim_path = '{ENV_REGEX_NS}/Robot/base_link'
     env.scene.camera.prim_path = "{ENV_REGEX_NS}/Robot/base_link/front_cam"
     # terminations
-    env.terminations.base_contact.params["sensor_cfg"].body_names = "body_link"
-    env.terminations.base_contact.params['threshold'] = 1.0
+    env.terminations.collision.params["sensor_cfg"].body_names = "body_link"
+    env.terminations.collision.params['threshold'] = 1.0
     
     return env

@@ -40,7 +40,13 @@ class SceneCfg(UrbanSceneCfg):
 @configclass
 class CommandsCfg:
     """Command specifications for the MDP."""
-    pass
+    pose_command = nav_mdp.UniformPose2dCommandCfg(
+        asset_name="robot",
+        simple_heading=False,
+        resampling_time_range=(30.0, 30.0),
+        debug_vis=True,
+        ranges=nav_mdp.UniformPose2dCommandCfg.Ranges(pos_x=(7.0, 10.0), pos_y=(7.0, 10.0), heading=(-math.pi, math.pi)),
+    )
 
 
 @configclass
@@ -80,13 +86,16 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
 
-    # -- task
     termination_penalty = RewTerm(func=loc_mdp.is_terminated, weight=-100.0)
     position_tracking = RewTerm(
         func=nav_mdp.position_command_error_tanh,
         weight=1.0,
         params={"std": 2.0, "command_name": "pose_command"},
     )
+    moving_towards_goal = RewTerm(
+        func=nav_mdp.moving_towards_goal_reward, 
+        weight=1.0, 
+        params={"command_name": "pose_command"})
 
 
 @configclass
@@ -94,6 +103,13 @@ class TerminationsCfg:
     """Termination terms for the MDP."""
 
     time_out = DoneTerm(func=loc_mdp.time_out, time_out=False)
+    collision = DoneTerm(
+        func=nav_mdp.illegal_contact, time_out=False,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names="body_link"), # change path to your robot
+            "threshold": 1.0
+            },
+    )
 
 
 @configclass

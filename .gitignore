@@ -35,6 +35,7 @@ docker/.container.cfg
 !.vscode
 
 # Outputs
+**/assets/*
 **/output/*
 **/outputs/*
 **/videos/*
