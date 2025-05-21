@@ -71,19 +71,6 @@ def root_height_below_minimum(
     asset: RigidObject = env.scene[asset_cfg.name]
     return asset.data.root_pos_w[:, 2] < minimum_height
 
-def out_of_region(
-    env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
-) -> torch.Tensor:
-    """Terminate when the asset's root height is below the minimum height.
-
-    Note:
-        This is currently only supported for flat terrains, i.e. the minimum height is in the world frame.
-    """
-    # extract the used quantities (to enable type-hinting)
-    asset: RigidObject = env.scene[asset_cfg.name]
-    out_of_region = (asset.data.root_pos_w[:, 0] - env.scene._default_env_origins[..., 0].reshape(-1, ) < 0) | (asset.data.root_pos_w[:, 0] - env.scene._default_env_origins[..., 0].reshape(-1, ) > 25) | (asset.data.root_pos_w[:, 1] - env.scene._default_env_origins[..., 1].reshape(-1, ) < 0) | (asset.data.root_pos_w[:, 1] - env.scene._default_env_origins[..., 1].reshape(-1, ) > 25)
-    return out_of_region
-
 """
 Joint terminations.
 """

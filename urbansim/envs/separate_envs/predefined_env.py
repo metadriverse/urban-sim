@@ -1,6 +1,16 @@
-"""Script to an environment with random action agent."""
+# Copyright (c) 2022-2025, The UrbanSim Project Developers.
+# Author: Honglin He
+# All rights reserved.
+#
+# SPDX-License-Identifier: BSD-3-Clause
 
-"""Launch Isaac Sim Simulator first."""
+import logging
+import time
+import gymnasium as gym
+import numpy as np
+from collections import defaultdict
+from typing import Union, Dict, AnyStr, Optional, Tuple, Callable, Any
+import copy
 
 # launch omniverse
 import argparse
@@ -15,7 +25,6 @@ from isaaclab.app import AppLauncher
 # add argparse arguments
 parser = argparse.ArgumentParser("Welcome to URBAN-SIM Environments!")
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to spawn.")
-parser.add_argument("--robot", type=str, default='coco', help="Number of environments to spawn.")
 parser.add_argument(
     "--color_scheme",
     type=str,
@@ -41,6 +50,8 @@ parser.add_argument(
 parser.add_argument(
     "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
 )
+parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
+parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
 AppLauncher.add_app_launcher_args(parser)
 from urbansim import cli_args
 cli_args.add_rsl_rl_args(parser)
@@ -70,21 +81,33 @@ from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR, ISAACLAB_NUCLEUS_DIR
 from isaaclab.assets import RigidObject, RigidObjectCfg
-from urbansim.primitives.locomotion.mixed_type import ObservationsCfg, CommandsCfg
 
-from urbansim.primitives.robot import *
-
-# choose robot
-if args_cli.robot == 'coco':
-    ROBOT_CFG = COCO_CFG
-    ROBOT_ACTION_CFG = COCOVelocityActionsCfg
-    MODIFY_FN = COCOMapModifyEnv
+from urbansim.scene.urban_scene_cfg import UrbanSceneCfg
+from urbansim.envs.abstract_env import AbstractEnv
+from urbansim.primitives.navigation.random_static import ObservationsCfg, RewardsCfg, TerminationsCfg, CommandsCfg, EventCfg, CurriculumCfg
+from urbansim.primitives.robot.coco import COCO_CFG, COCOVelocityActionsCfg, COCONavModifyEnv
 
 """
-Define the Scene
+Define the Urban Scene
 """
 @configclass
-class BaseSceneCfg(InteractiveSceneCfg):
+class BaseUrbanSceneCfg(UrbanSceneCfg):
+    # scenario type
+    scenario_generation_method: str = "predefined"
+    
+    # place objects
+    temp_object = RigidObjectCfg(
+        prim_path="/World/envs/env_.*/Cone",
+        spawn=sim_utils.ConeCfg(
+            radius=0.1,
+            height=0.2,
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+            mass_props=sim_utils.MassPropertiesCfg(mass=1.0),
+            collision_props=sim_utils.CollisionPropertiesCfg(),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=0.2),
+        ),
+        init_state=RigidObjectCfg.InitialStateCfg(),
+    )
     
     # robot
     robot: ArticulationCfg = MISSING
@@ -138,33 +161,24 @@ class BaseSceneCfg(InteractiveSceneCfg):
     sky_light = AssetBaseCfg(
         prim_path="/World/skyLight",
         spawn=sim_utils.DomeLightCfg(
+            #intensity=750.0,
             texture_file=f"{ISAAC_NUCLEUS_DIR}/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr",
             intensity=750.0,
+            #color=(0.75, 0.75, 0.75),
+            # visible_in_primary_ray=False,
         ),
     )
 
-@configclass
-class CurriculumCfg:
-    pass
-@configclass
-class EventCfg:
-    pass
-@configclass
-class TerminationsCfg:
-    pass
-@configclass
-class RewardsCfg:
-    pass
 
 """
 Define the Environment
 """
 @configclass
 class BaseEnvCfg(ManagerBasedRLEnvCfg):
-    scene = BaseSceneCfg(num_envs=args_cli.num_envs, env_spacing=10.0)
+    scene = BaseUrbanSceneCfg(num_envs=4, env_spacing=2.0)
     
     observations = ObservationsCfg()
-    actions = ROBOT_ACTION_CFG()
+    actions = GO2MapActionsCfg()
     
     rewards = RewardsCfg()
     
@@ -177,7 +191,7 @@ class BaseEnvCfg(ManagerBasedRLEnvCfg):
     def __post_init__(self):
         """Post initialization."""
         # general settings
-        self.decimation = 4
+        self.decimation = 10
         self.episode_length_s = 20
         # simulation settings
         self.sim.dt = 0.005
@@ -191,12 +205,12 @@ class BaseEnvCfg(ManagerBasedRLEnvCfg):
             if self.scene.contact_forces is not None:
                 self.scene.contact_forces.update_period = self.sim.dt
                 
-        self.scene.robot = ROBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.scene.robot = GO2_MAP_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         if hasattr(self.scene, 'height_scanner'):
             self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/base"
 
         # modify env
-        MODIFY_FN(self)
+        GO2MapModifyEnv(self)
     
     
 """
@@ -205,7 +219,7 @@ register env
 import gymnasium as gym
 gym.register(
     id=f"UrbanSim-Base",
-    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    entry_point="urbansim.envs:AbstractEnv",
     disable_env_checker=True,
     kwargs={
         "env_cfg_entry_point": BaseEnvCfg,

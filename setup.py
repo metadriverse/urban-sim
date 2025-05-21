@@ -54,6 +54,7 @@ install_requires = [
     "pillow",
     "pytest",
     "opencv-python",
+    "open3d",
     "lxml",
     "scipy",
     "psutil",
