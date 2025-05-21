@@ -178,7 +178,7 @@ class BaseEnvCfg(ManagerBasedRLEnvCfg):
     scene = BaseUrbanSceneCfg(num_envs=4, env_spacing=2.0)
     
     observations = ObservationsCfg()
-    actions = GO2MapActionsCfg()
+    actions = COCOVelocityActionsCfg()
     
     rewards = RewardsCfg()
     
@@ -205,12 +205,12 @@ class BaseEnvCfg(ManagerBasedRLEnvCfg):
             if self.scene.contact_forces is not None:
                 self.scene.contact_forces.update_period = self.sim.dt
                 
-        self.scene.robot = GO2_MAP_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.scene.robot = COCO_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         if hasattr(self.scene, 'height_scanner'):
             self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/base"
 
         # modify env
-        GO2MapModifyEnv(self)
+        COCONavModifyEnv(self)
     
     
 """
