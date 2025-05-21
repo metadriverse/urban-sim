@@ -1,2 +1,2 @@
 from .coco import *
-from .go2 import *
+from .unitree_go2 import *

@@ -1,0 +1,23 @@
+Task: Locomotion
+Env:
+  name: general
+Robot:
+  type: anymal_c # [unitree_go2, coco, anymal_c, unitree_b2w, unitree_g2]
+  controller: default # [default] or specific module
+  sensor: default
+  tiled_sensor: True
+  init_position: [0., 0., 0.4]
+Omniverse:
+  headless: True
+  simulation_dt: 0.005
+  rendering_interval: 4
+  decimation: 4
+  episode_length_s: 20.0
+  env_spacing: 3.0
+Training:
+  framework: rsl # [rl_games, rsl]
+  training_config_entry: default # [default] or specific entry
+  use_gpu: True
+  num_envs: 1024
+  num_gpu: 1
+  use_ddp: False

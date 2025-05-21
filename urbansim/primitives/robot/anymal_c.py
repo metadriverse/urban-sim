@@ -30,5 +30,61 @@ from isaaclab.actuators import ImplicitActuatorCfg, DelayedPDActuatorCfg
 from isaaclab.envs import ManagerBasedRLEnv
 
 from isaaclab_assets.robots.anymal import ANYMAL_C_CFG
-ANYMAL_C_CFG.init_state.pos = (0.0, 0.0, 0.3)
+ANYMAL_C_CFG.init_state.pos = (0.0, 0.0, 0.5)
 
+# ============================
+# Locomotion
+# ============================
+@configclass
+class AnymalCLocActionsCfg:
+    """Action specifications for the MDP."""
+    joint_pos = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*"], scale=0.5, use_default_offset=True)
+    
+# Flat without height scanner
+def AnymalCFlatModifyEnv(env):
+    pass
+    
+# Terrain with height scanner
+def AnymalCRoughModifyEnv(env):
+    return env
+
+# ============================
+# Navigation
+# ============================
+@configclass
+class AnymalCNavActionsCfg:
+    """Action specifications for the MDP."""
+    pass
+
+# ============================
+# Trainig Config
+# ============================
+from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, RslRlPpoAlgorithmCfg
+@configclass
+class PPORunnerCfg(RslRlOnPolicyRunnerCfg):
+    num_steps_per_env = 24
+    max_iterations = 1500
+    save_interval = 50
+    experiment_name = "anymalC_locomotion"
+    empirical_normalization = False
+    clip_actions = False
+    policy = RslRlPpoActorCriticCfg(
+        init_noise_std=1.0,
+        actor_hidden_dims=[512, 256, 128],
+        critic_hidden_dims=[512, 256, 128],
+        activation="elu",
+    )
+    algorithm = RslRlPpoAlgorithmCfg(
+        value_loss_coef=1.0,
+        use_clipped_value_loss=True,
+        clip_param=0.2,
+        entropy_coef=0.005,
+        num_learning_epochs=5,
+        num_mini_batches=4,
+        learning_rate=1.0e-3,
+        schedule="adaptive",
+        gamma=0.99,
+        lam=0.95,
+        desired_kl=0.01,
+        max_grad_norm=1.0,
+    )
