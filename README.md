@@ -2,8 +2,12 @@
 
 [![Static Badge](https://img.shields.io/badge/URBANSIM-arxiv-blue)](https://arxiv.org/pdf/2505.00690.pdf)
 [![Documentation](https://readthedocs.org/projects/metaurban-simulator/badge/?version=latest)](TODO)
-[![GitHub license](https://img.shields.io/github/license/metadriverse/metaurban)](TODO)
-[![GitHub contributors](https://img.shields.io/github/contributors/metadriverse/metaurban)](TODO)
+[![GitHub license](https://img.shields.io/github/license/metadriverse/urban-sim)](TODO)
+[![GitHub contributors](https://img.shields.io/github/contributors/metadriverse/urban-sim)](TODO)
+
+<p align="center">
+  <img src="docs/readme/URBANSIM.png" alt="Urban-Sim Teaser" width="100%">
+</p>
 
 <div style="text-align: center; width:100%; margin: 0 auto; display: inline-block">
 <strong>
@@ -33,15 +37,9 @@ To ensure the best experience with **URBAN-SIM**, please review the following ha
 
 - **Recommended Hardware**:  
   - **OS**: Ubuntu 22.04; 24.04.
-  - **GPU**: Nvidia GPU with at least **16GB RAM** and **12GB VRAM**.  
+  - **GPU**: Nvidia GPU with at least **16GB RAM** and **12GB VRAM**.
+    - Tested GPUs: **Nvidia RTX-4080, RTX-4090, L40S**.   
   - **Storage**: Minimum of **20GB free space**.  
-
-- **Performance Benchmarks**:  
-  - Tested GPUs: **Nvidia RTX-4080, RTX-4090, L40S**.  
-  - Example benchmark:  
-    - Running `TODO` achieves:  
-      - ~**TODO FPS**  
-      - ~**TODO GPU memory usage**
 
 ### Installation
 ```bash
@@ -49,7 +47,7 @@ To ensure the best experience with **URBAN-SIM**, please review the following ha
 git clone -b main --depth 1 TODO
 cd TODO
 
-# Install Isaacsim
+# Install Isaacsim 4.5
 missref
 
 # Create a new conda environment and install required libraries
