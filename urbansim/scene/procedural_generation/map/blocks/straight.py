@@ -1,0 +1,2 @@
+class Straight:
+    ID = 'S'

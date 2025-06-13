@@ -86,6 +86,11 @@ from urbansim.scene.urban_scene_cfg import UrbanSceneCfg
 from urbansim.envs.abstract_env import AbstractEnv
 from urbansim.primitives.navigation.random_static import ObservationsCfg, RewardsCfg, TerminationsCfg, CommandsCfg, EventCfg, CurriculumCfg
 from urbansim.primitives.robot.coco import COCO_CFG, COCOVelocityActionsCfg, COCONavModifyEnv
+from urbansim.primitives.robot.wheelchair_nodynamics import WheelChairCfg, WheelChairMovingActionsCfg, WheelChairNavModifyEnv
+
+ROBOT = WheelChairCfg
+ACTION = WheelChairMovingActionsCfg
+MODIFY = WheelChairNavModifyEnv
 
 """
 Define the Urban Scene
@@ -106,7 +111,7 @@ class BaseUrbanSceneCfg(UrbanSceneCfg):
             collision_props=sim_utils.CollisionPropertiesCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=0.2),
         ),
-        init_state=RigidObjectCfg.InitialStateCfg(),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.5, 0.5, 0.0)),
     )
     
     # robot
@@ -132,6 +137,25 @@ class BaseUrbanSceneCfg(UrbanSceneCfg):
         ),
         debug_vis=False,
     )
+    
+    # WheelChairCfg = RigidObjectCfg(
+    #     prim_path="/World/envs/env_.*/wc",
+    #     spawn=sim_utils.UsdFileCfg(
+    #         usd_path=f"assets/robots/wheel_chair.usd",
+    #         activate_contact_sensors=True,
+    #         rigid_props=sim_utils.RigidBodyPropertiesCfg(
+    #             disable_gravity=False,
+    #             retain_accelerations=False,
+    #             linear_damping=0.0,
+    #             angular_damping=0.0,
+    #             max_linear_velocity=1000.0,
+    #             max_angular_velocity=1000.0,
+    #             max_depenetration_velocity=1.0,
+    #         ),
+    #     ),
+    #     init_state=RigidObjectCfg.InitialStateCfg(
+    #         pos=(0., 0., 0.3))
+    # )
     
     # sensor
     contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True)
@@ -173,10 +197,10 @@ Define the Environment
 """
 @configclass
 class BaseEnvCfg(ManagerBasedRLEnvCfg):
-    scene = BaseUrbanSceneCfg(num_envs=args_cli.num_envs, env_spacing=2.0)
+    scene = BaseUrbanSceneCfg(num_envs=args_cli.num_envs, env_spacing=10.0)
     
     observations = ObservationsCfg()
-    actions = COCOVelocityActionsCfg()
+    actions = ACTION()
     
     rewards = RewardsCfg()
     
@@ -203,12 +227,12 @@ class BaseEnvCfg(ManagerBasedRLEnvCfg):
             if self.scene.contact_forces is not None:
                 self.scene.contact_forces.update_period = self.sim.dt
                 
-        self.scene.robot = COCO_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.scene.robot = ROBOT.replace(prim_path="{ENV_REGEX_NS}/Robot")
         if hasattr(self.scene, 'height_scanner'):
             self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/base"
 
         # modify env
-        COCONavModifyEnv(self)
+        MODIFY(self)
     
     
 """

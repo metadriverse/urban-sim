@@ -26,9 +26,6 @@ from isaaclab.app import AppLauncher
 parser = argparse.ArgumentParser("Welcome to URBAN-SIM Environments!")
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to spawn.")
 parser.add_argument("--use_async", action="store_true", default=False, help="Run simulation in async mode.")
-parser.add_argument("--use_terrain", action="store_true", default=False, help="Generate terrain in the environment.")
-parser.add_argument("--save_images", action="store_true", default=False, help="Whether to save images during the simulation.")
-parser.add_argument("--scenario_type", type=str, default="static", choices=['clean', 'static', 'dynamic'])
 parser.add_argument(
     "--color_scheme",
     type=str,
@@ -88,60 +85,17 @@ from isaaclab.assets import RigidObject, RigidObjectCfg
 
 from urbansim.scene.urban_scene_cfg import UrbanSceneCfg
 from urbansim.envs.abstract_env import AbstractEnv
-from urbansim.primitives.navigation.random_env_cfg import SceneCfg, ObservationsCfg, RewardsCfg, TerminationsCfg, CommandsCfg, EventCfg, CurriculumCfg
+from urbansim.primitives.navigation.pg_static import SceneCfg, ObservationsCfg, RewardsCfg, TerminationsCfg, CommandsCfg, EventCfg, CurriculumCfg
 from urbansim.primitives.robot.coco import COCO_CFG, COCOVelocityActionsCfg, COCONavModifyEnv
 
-COCO_CFG.init_state.pos = (1.0, 1.0, 0.5)
-pg_config = dict(
-    type=args_cli.scenario_type, # [clean, static, dynamic]
-    with_terrain=args_cli.use_terrain,
-    with_boundary=True,
-    map_region=20,
-    buffer_width=1,
-    num_object=13,
-    num_pedestrian=4,
-    walkable_seed=0,
-    non_walkable_seed=1,
-    seed=423,
-    unique_env_num=20,
-    ped_forward_inteval=10,
-    moving_max_t=80,
-)
+COCO_CFG.init_state.pos = (2.0, 2.0, 0.5)
 
 """
 Define the Environment
 """
 @configclass
-class ViewerCfg:
-    """Configuration of the scene viewport camera."""
-    eye: tuple[float, float, float] = (-20, -20, 7.2)
-
-    lookat: tuple[float, float, float] = (20, 20, -5)
-
-    cam_prim_path: str = "/OmniverseKit_Persp"
-
-    resolution: tuple[int, int] = (1920, 1080)
-
-    origin_type: str = "world"
-
-    env_index: int = 0
-
-    asset_name: str | None = None
-    
-@configclass
 class BaseEnvCfg(ManagerBasedRLEnvCfg):
-    if args_cli.use_async:
-        print("Using async mode for the environment.")
-        scene = SceneCfg(scenario_generation_method = "limited async procedural generation", 
-                         pg_config=pg_config,
-                         num_envs=args_cli.num_envs, env_spacing=21.0)
-    else:
-        print("Using sync mode for the environment.")
-        scene = SceneCfg(scenario_generation_method = "limited sync procedural generation", 
-                         pg_config=pg_config,
-                         num_envs=args_cli.num_envs, env_spacing=21.0)
-    
-    viewer = ViewerCfg()
+    scene = SceneCfg(num_envs=args_cli.num_envs, env_spacing=21.0)
     
     observations = ObservationsCfg()
     actions = COCOVelocityActionsCfg()
@@ -196,28 +150,12 @@ gym.register(
 def main():
     env = gym.make("UrbanSim-Base", cfg=BaseEnvCfg(), render_mode='rgb_array')
     env.reset()
-    if args_cli.save_images:
-        root_dir = './log_images'
-        import os
-        from isaacsim.sensors.camera import Camera
-        os.makedirs(root_dir, exist_ok=True)
-        cam_prim_path = "/OmniverseKit_Persp"
-        camera = Camera(prim_path=cam_prim_path, resolution=(1920, 1080))
-        camera.initialize()
-        
     for t in range(1000000):
         action = env.action_space.sample()
         action = torch.from_numpy(action).float().to(env.device)
         obs, reward, terminated, truncated, info = env.step(action)
-        if args_cli.save_images:
-            import cv2
-            rgb_image = camera.get_rgba()
-            cv2.imwrite(f"{root_dir}/rgb_{t:04d}.png", rgb_image[:, :, :3][..., ::-1])
-            if t == 200:
-                print(f"Saved images to {root_dir}")
-                env.close()
-                break
-    
+
+
 if __name__ == "__main__":
     # run the main function
     main()

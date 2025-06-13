@@ -136,7 +136,7 @@ class PGDrivableAreaProperty:
     #  when set to True, Vehicles will not generate on this block
     PROHIBIT_TRAFFIC_GENERATION = False
 
-class MetaUrbanType:
+class UrbanType:
     """
     Following waymo style, this class defines a set of strings used to denote different types of objects.
     Those types are used within MetaUrban and might mismatch to the strings used in other dataset.
@@ -208,10 +208,6 @@ class MetaUrbanType:
     INVISIBLE_WALL = "INVISIBLE_WALL"
     BUILDING = "BUILDING"
 
-    # ===== Coordinate system =====
-    COORDINATE_metaurban = "metaurban"
-    COORDINATE_WAYMO = "waymo"
-
     @classmethod
     def is_traffic_object(cls, type):
         return type in [cls.TRAFFIC_CONE, cls.TRAFFIC_BARRIER, cls.TRAFFIC_OBJECT]
@@ -253,7 +249,7 @@ class MetaUrbanType:
 
     @classmethod
     def is_white_line(cls, line):
-        return MetaUrbanType.is_road_line(line) and not MetaUrbanType.is_yellow_line(line)
+        return UrbanType.is_road_line(line) and not UrbanType.is_yellow_line(line)
 
     @classmethod
     def is_broken_line(cls, line):
@@ -279,19 +275,19 @@ class MetaUrbanType:
 
     @classmethod
     def is_stop_sign(cls, type):
-        return type == MetaUrbanType.STOP_SIGN
+        return type == UrbanType.STOP_SIGN
 
     @classmethod
     def is_speed_bump(cls, type):
-        return type == MetaUrbanType.SPEED_BUMP
+        return type == UrbanType.SPEED_BUMP
 
     @classmethod
     def is_driveway(cls, type):
-        return type == MetaUrbanType.DRIVEWAY
+        return type == UrbanType.DRIVEWAY
 
     @classmethod
     def is_crosswalk(cls, type):
-        return type == MetaUrbanType.CROSSWALK
+        return type == UrbanType.CROSSWALK
 
     @classmethod
     def is_vehicle(cls, type):
@@ -357,16 +353,16 @@ class MetaUrbanType:
     def __init__(self, type=None):
         # TODO extend this base class to all objects! It is only affect lane so far.
         # TODO Or people can only know the type with isinstance()
-        self.metaurban_type = MetaUrbanType.UNSET
+        self.urban_type = UrbanType.UNSET
         if type is not None:
-            self.set_metaurban_type(type)
+            self.set_urban_type(type)
 
-    def set_metaurban_type(self, type):
-        if type in MetaUrbanType.__dict__.values():
+    def set_urban_type(self, type):
+        if type in UrbanType.__dict__.values():
             # Do something if type matches one of the class variables
-            self.metaurban_type = type
+            self.urban_type = type
         else:
-            raise ValueError(f"'{type}' is not a valid MetaUrbanType.")
+            raise ValueError(f"'{type}' is not a valid UrbanType.")
 
 def _random_points_new(map_mask, num, min_dis=5, generated_position=None):
         import matplotlib.pyplot as plt
@@ -502,7 +498,7 @@ def construct_continuous_polygon(lane, start_lat, end_lat):
     return polygon
 
 def construct_broken_line_polygon(lane, lateral, line_color, line_type):
-    assert MetaUrbanType.is_broken_line(line_type)
+    assert UrbanType.is_broken_line(line_type)
     points = lane.get_polyline(2, lateral)
     polygon = []
     for index in range(0, len(points) - 1, 2):
@@ -516,15 +512,13 @@ def construct_broken_line_polygon(lane, lateral, line_color, line_type):
     return polygon
 import trimesh
 from shapely.geometry import Polygon
-def generate_random_road(area_size=(100, 100)):
+def generate_random_road(area_size=(100, 100), level=5):
     start = (0.25, 0.25)
     end = (np.random.uniform(area_size[0], area_size[0]), np.random.uniform(area_size[1], area_size[1]))
     
-    mid_points_x = np.linspace(start[0], end[0], 9)
-    mid_points_y = np.linspace(start[1], end[1], 9)
-    # mid_points_y[1:-1] = np.random.uniform(0, area_size[1], size=7)
-    # mid_points_x[1] = 2.
-    # mid_points_y[1] = 0.25
+    mid_points_x = np.linspace(start[0], end[0], level + 2)
+    mid_points_y = np.linspace(start[1], end[1], level + 2)
+    mid_points_y[1:-1] = np.random.uniform(0, area_size[1], size=level)
 
     x_points = mid_points_x
     y_points = mid_points_y
@@ -536,7 +530,7 @@ def generate_random_road(area_size=(100, 100)):
     
     return x_points, y_points
 
-def get_road_trimesh(x, y, area_size, min_road_width=15, max_road_width=18, height=2.1, boundary=[-1e10, 1e10]):
+def get_road_trimesh(x, y, area_size, min_road_width=15, max_road_width=18, height=0.05, boundary=[-1e10, 1e10]):
     road_width = np.random.uniform(min_road_width, max_road_width)
     
     upper_boundary = y + road_width / 2
@@ -550,6 +544,19 @@ def get_road_trimesh(x, y, area_size, min_road_width=15, max_road_width=18, heig
     mesh = trimesh.creation.extrude_polygon(polygon, height=height)
     
     return mesh, [upper_boundary, lower_boundary], polyline_points
+
+UV_SCLAE = 20
+def uv_texturing(mesh, scale=UV_SCLAE):
+    uvs = []
+    for vertex in mesh.vertices:
+        uv = [vertex[0], vertex[1]]
+        uvs.append(uv)
+    uvs = np.array(uvs)
+    uvs = (uvs - np.min(uvs)) / (np.max(uvs) - np.min(uvs))
+    uvs *= scale
+    mesh.visual.uvs = uvs
+    
+    return mesh
 
 # UrbanVerse Utils
 import os

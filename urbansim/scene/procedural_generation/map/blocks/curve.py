@@ -1,0 +1,2 @@
+class Curve:
+    ID = 'C'

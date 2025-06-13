@@ -56,7 +56,7 @@ COCO_CFG = ArticulationCfg(
             ".*wheel_joint*": 0.0,"base_to_front_axle_joint":0.0,
         },
         joint_vel={
-            ".*wheel_joint":0.0,"base_to_front_axle_joint":0.0,#TODO: WHY NOT WORKING
+            ".*wheel_joint":0.0,"base_to_front_axle_joint":0.0,
         },
     ),
     actuators={"wheels": DelayedPDActuatorCfg(
@@ -93,7 +93,7 @@ COCO_CFG = ArticulationCfg(
         )
         
         },
-    soft_joint_pos_limit_factor=1.0,# TODO: 0.95
+    soft_joint_pos_limit_factor=1.0,#0.95
 )
 
 DT = 0.1
@@ -349,7 +349,8 @@ class COCOWaypointActionsCfg:
 def COCONavModifyEnv(env):
     # change to base link
     # sensors in the scene
-    env.scene.height_scanner.prim_path = '{ENV_REGEX_NS}/Robot/base_link'
+    if hasattr(env.scene, 'height_scanner'):
+        env.scene.height_scanner.prim_path = '{ENV_REGEX_NS}/Robot/base_link'
     env.scene.camera.prim_path = "{ENV_REGEX_NS}/Robot/base_link/front_cam"
     # terminations
     env.terminations.collision.params["sensor_cfg"].body_names = "body_link"

@@ -48,20 +48,20 @@ terrain_gen_cfg = ROUGH_TERRAINS_CFG.replace(curriculum=False, color_scheme='non
 
 light = np.random.choice(
     [
-        'Night/kloppenheim_02_4k.hdr',
-        'Night/moonlit_golf_4k.hdr',
-        'Cloudy/abandoned_parking_4k.hdr',
+        # 'Night/kloppenheim_02_4k.hdr',
+        # 'Night/moonlit_golf_4k.hdr',
+        # 'Cloudy/abandoned_parking_4k.hdr',
         'Cloudy/champagne_castle_1_4k.hdr',
-        'Cloudy/evening_road_01_4k.hdr',
-        'Cloudy/kloofendal_48d_partly_cloudy_4k.hdr',
-        'Cloudy/lakeside_4k.hdr',
-        'Cloudy/sunflowers_4k.hdr',
-        'Cloudy/table_mountain_1_4k.hdr',
-        'Evening/evening_road_01_4k.hdr',
-        'Storm/approaching_storm_4k.hdr',
+        # 'Cloudy/evening_road_01_4k.hdr',
+        # 'Cloudy/kloofendal_48d_partly_cloudy_4k.hdr',
+        # 'Cloudy/lakeside_4k.hdr',
+        # 'Cloudy/sunflowers_4k.hdr',
+        # 'Cloudy/table_mountain_1_4k.hdr',
+        # 'Evening/evening_road_01_4k.hdr',
+        # 'Storm/approaching_storm_4k.hdr',
     ]
 )
-light_intensity = np.random.uniform(700.0, 800.0)
+light_intensity = np.random.uniform(880.0, 900.0)
 
 #------------------------------------------------
 # Scene Config
@@ -69,23 +69,24 @@ light_intensity = np.random.uniform(700.0, 800.0)
 class SceneCfg(UrbanSceneCfg):
     """Configuration"""
     # scenario type
-    scenario_generation_method: str = "sync procedural generation"
+    scenario_generation_method: str = "limited sync procedural generation"
     # [sync or async]
     
     # procedural generation config
     pg_config: dict = dict(
-        type='static', # [static, dynamic]
-        map_config='XCX', # [X for intersection, S for straight road, C for curved road] [user can use any combination of these letters to generate a map, such as XSX]
-        lane_num = 2,
-        lane_width = 3.5,
-        exit_length = 50.,
-        sidewalk_type='Medium Commercial',
-        # ['Narrow Sidewalk', 'Narrow Sidewalk with Trees', 'Ribbon Sidewalk', 'Neighborhood 1', 'Neighborhood 2',
-        #     'Medium Commercial', 'Wide Commercial'
-        # ]
-        object_density=0.7,
+        type='dynamic', # [clean, static, dynamic]
+        with_terrain=True,
+        with_boundary=True,
+        map_region=20,
+        buffer_width=1,
+        num_object=10,
+        num_pedestrian=9,
+        walkable_seed=0,
+        non_walkable_seed=1,
         seed=0,
-        use_orca_for_agent_trajectory_generation=False,
+        unique_env_num=20,
+        ped_forward_inteval=10,
+        moving_max_t=80,
     )
     
     # robot
@@ -114,6 +115,42 @@ class SceneCfg(UrbanSceneCfg):
     
     terrain_gen_cfg = ROUGH_TERRAINS_CFG.replace(curriculum=False, color_scheme='none')
     
+    terrain_importer = TerrainImporterCfg(
+        prim_path=f"/World/Obstacle_terrain",
+        max_init_terrain_level=None,
+        terrain_type="plane",
+        terrain_generator=terrain_gen_cfg,
+        debug_vis=False,
+        visual_material=None
+    )
+    
+    terrain_importer_walkable_list = [
+        TerrainImporterCfg(
+            prim_path=f"/World/Walkable_{i:03d}",
+            max_init_terrain_level=None,
+            terrain_type="plane",
+            terrain_generator=terrain_gen_cfg,
+            debug_vis=False,
+            visual_material=None
+        ) for i in range(4)
+    ]
+    terrain_non_walkable_list = [
+        TerrainImporterCfg(
+            prim_path=f"/World/NonWalkable_{i:03d}",
+            max_init_terrain_level=None,
+            terrain_type="plane",
+            terrain_generator=terrain_gen_cfg,
+            debug_vis=False,
+            visual_material=None
+        ) for i in range(4)
+    ]
+    terrain_walkable_material_list = [
+        sim_utils.MdlFileCfg(mdl_path=walkable_material_path_list[i], project_uvw=True, texture_scale=1000) for i in range(len(terrain_importer_walkable_list))
+    ]
+    terrain_non_walkable_material_list = [
+        sim_utils.MdlFileCfg(mdl_path=non_walkable_material_path_list[i], project_uvw=True, texture_scale=1000) for i in range(len(terrain_non_walkable_list))
+    ]
+    
     # sensor
     contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True)
     # cameras
@@ -127,6 +164,15 @@ class SceneCfg(UrbanSceneCfg):
             focal_length=12.0, focus_distance=400.0, horizontal_aperture=30.0, clipping_range=(0.1, 1.0e5)
         ),
         offset=TiledCameraCfg.OffsetCfg(pos=(0.510, 0.0, 0.015), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
+    )
+    # height scanner
+    height_scanner = RayCasterCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/base",
+        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
+        attach_yaw_only=True,
+        pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=[1.6, 1.0]),
+        debug_vis=True,
+        mesh_prim_paths=[f"/World/ground"],
     )
     
     # lights

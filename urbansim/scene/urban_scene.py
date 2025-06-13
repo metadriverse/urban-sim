@@ -48,27 +48,6 @@ from isaaclab.terrains import TerrainImporter, TerrainImporterCfg
 from .urban_scene_cfg import UrbanSceneCfg
 from .utils import *
 
-# from metaurban.engine.base_engine import BaseEngine
-# from urbansim.utils.map_manager import PGMapManager
-# from urbansim.utils.geometry import (construct_lane, 
-#                                      construct_continuous_line_polygon, 
-#                                      construct_continuous_polygon, 
-#                                      construct_broken_line_polygon,
-#                                      generate_random_road,
-#                                      get_road_trimesh)
-# from metaurban.manager.traffic_manager import TrafficMode
-# from metaurban.manager.sidewalk_manager import AssetManager
-# from metaurban.manager.humanoid_manager import PGBackgroundSidewalkAssetsManager
-
-# from metaurban.utils import clip, Config
-# from metaurban.engine.engine_utils import set_global_random_seed
-# from urbansim.utils import BASE_DEFAULT_CONFIG
-# from metaurban.component.map.pg_map import parse_map_config, MapGenerateMethod
-# from metaurban.utils.math import norm
-# from metaurban.constants import TerrainProperty
-# from metaurban.constants import MetaUrbanType, CamMask, PGLineType, PGLineColor, PGDrivableAreaProperty
-# from metaurban.component.road_network import Road
-
 from urbansim.assets.rigid_object import RigidObject
 from urbansim.assets.rigid_object_cfg import RigidObjectCfg
 
@@ -182,9 +161,7 @@ class UrbanScene(InteractiveScene):
                                                        'sync procedural generation', 
                                                        'limited async procedural generation', 
                                                        'limited sync procedural generation', 
-                                                       'predefined', 
-                                                       '3dgs',
-                                                       'urban cousion'], "Invalid scenario type not in ['async procedural generation', 'sync procedural generation', 'limited async procedural generation', 'limited sync procedural generation', 'predefined', '3dgs']"
+                                                       'predefined'], "Invalid scenario type not in ['async procedural generation', 'sync procedural generation', 'limited async procedural generation', 'limited sync procedural generation', 'predefined']"
         if "async" in self.cfg.scenario_generation_method:
             self.cfg.replicate_physics = False
             print(f'[NOTE] Make sure that the physics replication is disabled for async procedural generation.')
@@ -230,6 +207,9 @@ class UrbanScene(InteractiveScene):
         
         super(UrbanScene, self).__init__(self.cfg)
         self.terrain_offsets = self._default_env_origins.cpu().numpy()
+        self.use_dynamic_pedestrians = False
+        print(f'[INFO] use_dynamic_pedestrians: {self.use_dynamic_pedestrians}')
+        self.count = 0
     
     def _add_entities_from_cfg(self, procedural_generation=False):
         """Add scene entities from the config."""
@@ -536,22 +516,9 @@ class UrbanScene(InteractiveScene):
     def reset(self, env_ids: Sequence[int] | None = None):
         
         super(UrbanScene, self).reset(env_ids)
-        # self.only_create_assets = True
-        # self.generate_limited_async_procedural_scene()
-        stage = omni.usd.get_context().get_stage()
-        # if not hasattr(self, 'light_index'):
-        #     self.light_index = 0
-        # else:
-        #     self.light_index += 1
-        # if self.light_index == 11:
-        #     self.light_index = 0
-        # for i in range(11):
-        #     if i == self.light_index:
-        #         prim = stage.GetPrimAtPath(Sdf.Path(f'/World/skyLight_{i:04d}'))
-        #         prim.SetActive(True)
-        #     else:
-        #         prim = stage.GetPrimAtPath(Sdf.Path(f'/World/skyLight_{i:04d}'))
-        #         prim.SetActive(False)
+        
+        # self.count = 0
+        # print(f'[INFO] UrbanScene reset called, count set to {self.count}')
 
     def update(self, dt):
         
@@ -571,25 +538,59 @@ class UrbanScene(InteractiveScene):
                 continue
             if isinstance(asset_cfg, TerrainImporterCfg):
                 prims_utils.delete_prim(asset_cfg.prim_path)
-        
+    def write_data_to_sim(self):
+        super().write_data_to_sim()
+        if self.use_dynamic_pedestrians:
+            self.write_dynamic_asset_state_to_sim()
+    
     def write_dynamic_asset_state_to_sim(self):
-        pass
-    
+        from isaacsim.core.prims import XFormPrim
+        if not hasattr(self, "ped_step_index"):
+            self.ped_step_index = 0
+            self.ped_direction = 1
+            print(f'[INFO] Pedestrian step index initialized to {self.ped_step_index}: Forward')
+            self.human_prim_expr = XFormPrim(f'/World/envs/env_.*/Dynamic_*')
+
+        if self.count % self.cfg.pg_config.get('ped_forward_inteval', 10) == 0:
+            self.ped_step_index += self.ped_direction
+            moving_max_t = self.cfg.pg_config.get('moving_max_t', 10)
+            if self.ped_step_index >= moving_max_t:
+                self.ped_step_index = moving_max_t
+                self.ped_direction = -1  
+            elif self.ped_step_index <= 0:
+                self.ped_step_index = 0
+                self.ped_direction = 1
+            
+            if self.ped_direction == 1:
+                start_xy = [xyzs[0] for xyzs in self.pedestrian_forward_start_end_pos_list]
+                end_xy = [xyzs[1] for xyzs in self.pedestrian_forward_start_end_pos_list]
+                heading = [wxyzs[0] for wxyzs in self.pedestrian_forward_backward_heading_list]
+            elif self.ped_direction == -1:
+                start_xy = [xyzs[0] for xyzs in self.pedestrian_forward_start_end_pos_list]
+                end_xy = [xyzs[1] for xyzs in self.pedestrian_forward_start_end_pos_list]
+                heading = [wxyzs[1] for wxyzs in self.pedestrian_forward_backward_heading_list]
+            start_xy_tensor = torch.tensor(start_xy, device=self.device, dtype=torch.float32).reshape(-1, 3)
+            end_xy_tensor = torch.tensor(end_xy, device=self.device, dtype=torch.float32).reshape(-1, 3)
+            wxyz_tensor = torch.tensor(heading, device=self.device, dtype=torch.float32).reshape(-1, 4)
+            current_xy_tensor = start_xy_tensor + (end_xy_tensor - start_xy_tensor) * (self.ped_step_index / moving_max_t)
+            current_xy_tensor = current_xy_tensor.reshape(self.num_envs, -1, 3) + self._default_env_origins[..., :3].reshape(self.num_envs, 1, 3)
+            current_xy_tensor = current_xy_tensor.reshape(-1, 3)
+            self.human_prim_expr.set_world_poses(
+                positions=current_xy_tensor,
+                orientations=wxyz_tensor,
+            )
+        
+        self.count += 1
+        
     def dynamic_asset_animatable_state(self):
-        pass
-    
-    def generate_and_spawn_map(self):
-        pass
-    
-    def generate_and_spawn_terrains(self):
-        pass
-    
-    def generate_and_spawn_static_objects(self):
-        pass
-    
-    def generate_and_spawn_dynamic_objects(self):
-        pass
-    
+        add_reference_to_stage(usd_path="assets/ped_actions/synbody_idle426.fbx/synbody_idle426.fbx.usd", prim_path="/World/run")
+        add_reference_to_stage(usd_path="assets/ped_actions/synbody_walking426.fbx/synbody_walking426.fbx.usd", prim_path="/World/walk")
+        timeline = omni.timeline.get_timeline_interface()
+        timeline.set_start_time(0)
+        timeline.set_end_time(1.1)
+        timeline.set_target_framerate(40)
+        timeline.set_looping(True)
+        
     def generate_scene(self, remove_current_scene: bool = False):
         """
         Args:
@@ -599,9 +600,7 @@ class UrbanScene(InteractiveScene):
             assert hasattr(self.cfg, 'pg_config'), "pg_config is required for procedural generation."
             print(f'[INFO] configuration for procedural generation: {self.cfg.pg_config}')
         
-        if self.cfg.scenario_generation_method == "3dgs":
-            self.generate_3dgs_scene()
-        elif self.cfg.scenario_generation_method == "predefined":
+        if self.cfg.scenario_generation_method == "predefined":
             self.generate_predefined_scene()
         elif self.cfg.scenario_generation_method == "async procedural generation":
             self.generate_async_procedural_scene()
@@ -612,166 +611,10 @@ class UrbanScene(InteractiveScene):
             self.generate_limited_async_procedural_scene()
         elif self.cfg.scenario_generation_method == "limited sync procedural generation":
             self.generate_limited_sync_procedural_scene()
-        elif self.cfg.scenario_generation_method == "urban cousion":
-            self.generate_urban_cousion_scene()
         else:
             raise ValueError(f"Invalid method: {self.cfg.scenario_generation_method}")
     
     def generate_predefined_scene(self):
-        # terrain_usd_path = '/home/hollis/projects/temp_folder_for_isaacurban/terrain_tmp_mesh.obj'
-        # # terrain_usd_path = '/home/sethzhao/Desktop/basic_terrains/intermediate_terrain.obj'
-        # mesh = trimesh.load(terrain_usd_path)
-        # mesh.vertices[:, 1] *= 1.2
-        # mesh.vertices[:, 0] *= 1.2
-        # mesh.vertices[:, 2] = np.median(mesh.vertices[:, 2]) 
-        # mesh.vertices[:, 2] += 0.9
-        
-        # stage = omni.usd.get_context().get_stage()
-        # prim = stage.GetPrimAtPath(Sdf.Path(f'/World/ground'))
-        # prim.SetActive(False)
-        
-        # # mesh_stair_03 = trimesh.load("/home/sethzhao/Desktop/basic_terrains/stair_0.3.obj")
-        # # mesh_stair_04 = trimesh.load("/home/sethzhao/Desktop/basic_terrains/stair_0.4.obj")
-        # # mesh_stair_05 = trimesh.load("/home/sethzhao/Desktop/basic_terrains/stair_0.5.obj")
-        # # mesh_stair_inv_04 = trimesh.load("/home/sethzhao/Desktop/basic_terrains/")
-        # # mesh_rough_03 = trimesh.load("/home/hollis/projects/temp_folder_for_isaacurban/basic_terrains/rough_0.3.obj")
-        # # mesh_rough_04 = copy.deepcopy(mesh_rough_03)
-        # # mesh_rough_05 = copy.deepcopy(mesh_rough_03)
-        # # mesh_rough_045 = trimesh.load("/home/sethzhao/Desktop/basic_terrains/rough_0.45.obj")
-        # # mesh_roughgrid_02 = trimesh.load("/home/sethzhao/Desktop/basic_terrains/rough_grid_0.2.obj")
-        # mesh_roughrandom_01 = trimesh.load("/home/hollis/projects/temp_folder_for_isaacurban/basic_terrains/rough_random01.obj")
-        # mesh_roughrandom_02 = copy.deepcopy(mesh_roughrandom_01)
-        # mesh_roughrandom_03 = copy.deepcopy(mesh_roughrandom_02)
-        # # mesh_roughrandom_015 = trimesh.load("/home/sethzhao/Desktop/basic_terrains/rough_random_015.obj")
-        
-        # mixed_type_02 = trimesh.load("/home/hollis/projects/temp_folder_for_isaacurban/mixed_type_terrains/mixed_type_07.obj")
-        # mixed_type_02.vertices[:, 0] *= 0.5
-        # mixed_type_02.vertices[:, 1] *= 0.5
-        # mixed_type_02.vertices[:, 2] *= 0.5
-        # mixed_type_02.vertices[:, 0] += 16 
-        # mixed_type_02.vertices[:, 1] += 3
-        # mixed_type_02.vertices[:, 2] -= 0.3
-        
-        # mixed_type_03 = trimesh.load("/home/hollis/projects/temp_folder_for_isaacurban/mixed_type_terrains/mixed_type_05.obj")
-        # mixed_type_03.vertices[:, 0] *= 0.6
-        # mixed_type_03.vertices[:, 1] *= 0.6
-        # mixed_type_03.vertices[:, 2] *= 0.6
-        # mixed_type_03.vertices[:, 0] += -5.5 
-        # mixed_type_03.vertices[:, 1] += -5
-        # mixed_type_03.vertices[:, 2] -= -0.2
-        
-        # prim_type_01 = trimesh.load("/home/hollis/projects/temp_folder_for_isaacurban/mixed_type_terrains/prim_type_02.obj")
-        # prim_type_01.vertices[:, 0] *= 0.6
-        # prim_type_01.vertices[:, 1] *= 0.6
-        # prim_type_01.vertices[:, 2] *= 0.6
-        # prim_type_01.vertices[:, 0] += 2
-        # prim_type_01.vertices[:, 1] += 8
-        # prim_type_01.vertices[:, 2] -= -0.1
-    
-        # mesh_list = [mesh,mixed_type_02, mixed_type_03, prim_type_01]#, prim_type_01, prim_type_02]
-        # prims_mesh_list_rand = [mesh_roughrandom_02, mesh_roughrandom_03]
-        
-        # # mesh_rough_05.vertices[:, 0] *= 0.3
-        # # mesh_rough_05.vertices[:, 1] *= 0.2
-        # # mesh_rough_05.vertices[:, 2] *= 0.3
-        # # mesh_rough_05.vertices[:, 0] += 2
-        # # mesh_rough_05.vertices[:, 1] += 6.25
-        
-        # mesh_roughrandom_01.vertices[:, 0] *= 0.3
-        # mesh_roughrandom_01.vertices[:, 1] *= 0.2
-        # mesh_roughrandom_01.vertices[:, 2] *= 0.3
-        # mesh_roughrandom_01.vertices[:, 0] += -10
-        # mesh_roughrandom_01.vertices[:, 1] += 8.15
-        
-        # prims_mesh_list = [mesh_roughrandom_01]
-
-        # width = [8, 0, -8]
-        # length = [5, -5, 8]
-        # import itertools
-        # combinations = list(itertools.product(width, length))
-        # random.shuffle(combinations)
-        # for i, each_mesh in enumerate(prims_mesh_list_rand):
-        #     random_scale_x = random.uniform(0.1, 0.4)
-        #     random_scale_y = random.uniform(0.1, 0.4)
-        #     dy, dx = combinations[i]
-        #     each_mesh.vertices[:, 0] *= random_scale_x
-        #     each_mesh.vertices[:, 1] *= random_scale_y 
-        #     each_mesh.vertices[:, 2] *= random_scale_x
-            
-        #     each_mesh.vertices[:, 0] += dx
-        #     each_mesh.vertices[:, 1] += dy
-
-        # mesh_list += prims_mesh_list
-        # mesh_list += prims_mesh_list_rand
-        
-        # # mesh_list += assets_mesh_list
-        # # mesh_list = [mesh]
-        # mesh_v = trimesh.util.concatenate(mesh_list)
-
-        # self.terrain_importer.import_mesh('mesh', mesh_v)
-        
-        # prims_mesh_list_dummy = copy.deepcopy(prims_mesh_list_rand + prims_mesh_list)
-        # for mesh in prims_mesh_list_dummy:
-        #     mesh.vertices[..., 2] += 0.001
-        #     uvs = []
-        #     for vertex in mesh.vertices:
-        #         uv = [vertex[0], vertex[1]]
-        #         uvs.append(uv)
-        #     uvs = np.array(uvs)
-        #     uvs = (uvs - np.min(uvs)) / (np.max(uvs) - np.min(uvs))
-        #     uvs *= 20
-        #     mesh.visual.uvs = uvs
-        # self.terrain_importer.import_mesh('mesh1', trimesh.util.concatenate(prims_mesh_list_dummy))
-        # sim_utils.bind_visual_material(f'/World/input_terrain/mesh1', f'/World/Looks/material_tmp')
-        
-        # base_mesh_dummy = copy.deepcopy(mesh_list[0])
-        # base_mesh_plane = copy.deepcopy(base_mesh_dummy)
-        # base_mesh_dummy.vertices[..., 2] += 0.002
-        # uvs = []
-        # for vertex in base_mesh_dummy.vertices:
-        #     uv = [vertex[0], vertex[1]]
-        #     uvs.append(uv)
-        # uvs = np.array(uvs)
-        # uvs = (uvs - np.min(uvs)) / (np.max(uvs) - np.min(uvs))
-        # uvs *= 20
-        # base_mesh_dummy.visual.uvs = uvs
-        # self.terrain_importer.import_mesh('mesh_base_dummy', base_mesh_dummy)
-        # sim_utils.bind_visual_material('/World/input_terrain/mesh_base_dummy'.format(i), f'/World/Looks/material_non_walkable_base')
-        # # self._terrain_input.import_mesh('scene', mesh_asset_car)
-        
-        # base_mesh_plane.vertices[..., 2] = np.median(base_mesh_dummy.vertices[..., 2]) + 0.002
-        # uvs = []
-        # for vertex in base_mesh_plane.vertices:
-        #     uv = [vertex[0], vertex[1]]
-        #     uvs.append(uv)
-        # uvs = np.array(uvs)
-        # uvs = (uvs - np.min(uvs)) / (np.max(uvs) - np.min(uvs))
-        # uvs *= 20
-        # base_mesh_plane.visual.uvs = uvs
-        # self.terrain_importer.import_mesh('mesh_base_plane_dummy', base_mesh_plane)
-        # sim_utils.bind_visual_material('/World/input_terrain/mesh_base_plane_dummy'.format(i), f'/World/Looks/material_walkable_base_plane')
-        
-        # other_mesh_list_dummy = copy.deepcopy(mesh_list[1:])
-        # for i, mesh in enumerate(other_mesh_list_dummy):
-        #     mesh.vertices[..., 2] += 0.001
-        #     uvs = []
-        #     for vertex in mesh.vertices:
-        #         uv = [vertex[0], vertex[1]]
-        #         uvs.append(uv)
-        #     uvs = np.array(uvs)
-        #     uvs = (uvs - np.min(uvs)) / (np.max(uvs) - np.min(uvs))
-        #     uvs *= 20
-        #     mesh.visual.uvs = uvs
-        #     self.terrain_importer.import_mesh('other_mesh_{}'.format(i), mesh)
-        #     if i % 2 == 0:   
-        #         sim_utils.bind_visual_material(f'/World/input_terrain/other_mesh_{i}', f'/World/Looks/material_walkable_stair_base')
-        #     else:
-        #         sim_utils.bind_visual_material(f'/World/input_terrain/other_mesh_{i}', f'/World/Looks/material_walkable_stair_base2')
-        
-
-        # stage = omni.usd.get_context().get_stage()
-        # prim = stage.GetPrimAtPath(Sdf.Path(f'/World/input_terrain/Environment'))
-        # prim.SetActive(False)
         return
     
     def generate_limited_sync_procedural_scene(self):
@@ -782,7 +625,10 @@ class UrbanScene(InteractiveScene):
         random.seed(generation_cfg['seed'])
         # ground plane
         tmp_origin = self._default_env_origins[..., :2].reshape(self.num_envs, 2).cpu().numpy()
-        if generation_cfg['type'] == 'map' or  generation_cfg['type'] == 'static' or  generation_cfg['type'] == 'dynamic':
+        mesh_block_height = 0.01
+        if generation_cfg['type'] == 'clean' or \
+           generation_cfg['type'] == 'static' or \
+           generation_cfg['type'] == 'dynamic':
             area_size = [area_size, area_size]
             
             polygon_points = []
@@ -794,35 +640,46 @@ class UrbanScene(InteractiveScene):
                 buffer_width = generation_cfg['buffer_width']
                 x, y = generate_random_road(area_size)
                 x, y = np.array(x), np.array(y)
+                
                 x += tmp_origin[env_idx, 0]
                 y += tmp_origin[env_idx, 1]
                 x = x.clip(tmp_origin[env_idx, 0], tmp_origin[env_idx, 0] + area_size[0])
                 y = y.clip(tmp_origin[env_idx, 1], tmp_origin[env_idx, 1] + area_size[1])
-                mesh, boundary_points, polyline_points = get_road_trimesh(x, y, area_size, boundary=(tmp_origin[env_idx, 1], tmp_origin[env_idx, 1] + area_size[1]))
+                
+                # walkable regions
+                mesh, boundary_points, polyline_points = get_road_trimesh(x, y, area_size, boundary=(tmp_origin[env_idx, 1], tmp_origin[env_idx, 1] + area_size[1]), height=mesh_block_height+0.02)
                 polyline_points_list.append(polyline_points)
                 polygon_points.append([x, y, boundary_points[0], boundary_points[1]])
+                
+                # non walkable regions
                 area_polygon = np.array([(0, 0), (0, area_size[1] + buffer_width), (area_size[0] + buffer_width, area_size[1] + buffer_width), (area_size[0] + buffer_width, 0)]).astype(float)
                 area_polygon[:, 0] += tmp_origin[env_idx, 0]
                 area_polygon[:, 1] += tmp_origin[env_idx, 1]
-                area_mesh = trimesh.creation.extrude_polygon(Polygon(area_polygon), height=2.21)
-                area_mesh.fix_normals()
-                mesh.fix_normals()
-                uvs = []
-                for vertex in mesh.vertices:
-                    uv = [vertex[0], vertex[1]]
-                    uvs.append(uv)
-                uvs = np.array(uvs)
-                uvs = (uvs - np.min(uvs)) / (np.max(uvs) - np.min(uvs))
-                uvs *= 20
-                mesh.visual.uv = uvs
-                uvs = []
-                for vertex in area_mesh.vertices:
-                    uv = [vertex[0], vertex[1]]
-                    uvs.append(uv)
-                uvs = np.array(uvs)
-                uvs = (uvs - np.min(uvs)) / (np.max(uvs) - np.min(uvs))
-                uvs *= 20
-                area_mesh.visual.uv = uvs
+                area_mesh = trimesh.creation.extrude_polygon(Polygon(area_polygon), height=mesh_block_height)
+                
+                # boundary polygons
+                if generation_cfg.get('with_boundary', False):
+                    boundary = np.array([(0, -0.5), (0, 0.0), (area_size[0] + 0.5, 0.0), (area_size[0] + 0.5, -0.5)]).astype(float)
+                    boundary[:, 0] += tmp_origin[env_idx, 0]
+                    boundary[:, 1] += tmp_origin[env_idx, 1]
+                    boundary_mesh = trimesh.creation.extrude_polygon(Polygon(boundary), height=mesh_block_height * 10)
+                    all_region_polygon_list[generation_cfg['non_walkable_seed']].append(boundary_mesh)
+                    boundary = np.array([(0, area_size[1]), (0, area_size[1] + 0.5), (area_size[0] + 0.5, area_size[1] + 0.5), (area_size[0] + 0.5, area_size[1])]).astype(float)
+                    boundary[:, 0] += tmp_origin[env_idx, 0]
+                    boundary[:, 1] += tmp_origin[env_idx, 1]
+                    boundary_mesh = trimesh.creation.extrude_polygon(Polygon(boundary), height=mesh_block_height * 10)
+                    all_region_polygon_list[generation_cfg['non_walkable_seed']].append(boundary_mesh)
+                    
+                    boundary = np.array([(-0.5, 0.0), (0, 0.0), (0.0, area_size[1] + 0.5), (-0.5, area_size[1] + 0.5)]).astype(float)
+                    boundary[:, 0] += tmp_origin[env_idx, 0]
+                    boundary[:, 1] += tmp_origin[env_idx, 1]
+                    boundary_mesh = trimesh.creation.extrude_polygon(Polygon(boundary), height=mesh_block_height * 10)
+                    all_region_polygon_list[generation_cfg['non_walkable_seed']].append(boundary_mesh)
+                    boundary = np.array([(area_size[0], 0.0), (area_size[0] + 0.5, 0.0), (area_size[0] + 0.5, area_size[1] + 0.5), (area_size[0], area_size[1] + 0.5)]).astype(float)
+                    boundary[:, 0] += tmp_origin[env_idx, 0]
+                    boundary[:, 1] += tmp_origin[env_idx, 1]
+                    boundary_mesh = trimesh.creation.extrude_polygon(Polygon(boundary), height=mesh_block_height * 10)
+                    all_region_polygon_list[generation_cfg['non_walkable_seed']].append(boundary_mesh)
 
                 walkable_region_polygon_list[generation_cfg['walkable_seed']].append(mesh)
                 all_region_polygon_list[generation_cfg['non_walkable_seed']].append(area_mesh)
@@ -834,38 +691,31 @@ class UrbanScene(InteractiveScene):
                 if len(mesh_list) == 0:
                     continue
                 combined_mesh = trimesh.util.concatenate(mesh_list)
-                uvs = []
-                for vertex in combined_mesh.vertices:
-                    uv = [vertex[0], vertex[1]]
-                    uvs.append(uv)
-                uvs = np.array(uvs)
-                uvs = (uvs - np.min(uvs)) / (np.max(uvs) - np.min(uvs))
-                uvs *= 20
-                combined_mesh.visual.uvs = uvs
+                
+                # uv for texturing
+                combined_mesh = uv_texturing(combined_mesh, scale=UV_SCLAE)
                 self.walkable_terrain_list[i].import_mesh('mesh', combined_mesh)
                 sim_utils.bind_visual_material(f'/World/Walkable_{i:03d}', f'/World/Looks/terrain_walkable_material_list_{i:03d}')
                 sim_utils.bind_physics_material(f'/World/Walkable_{i:03d}', f'/World/Looks/terrain_non_walkable_material_list_{i:03d}')
                 stage = omni.usd.get_context().get_stage()
                 prim = stage.GetPrimAtPath(Sdf.Path(f'/World/Walkable_{i:03d}/Environment'))
                 prim.SetActive(False)
+                
             for i in range(len(all_region_polygon_list)):
                 mesh_list = all_region_polygon_list[i]
                 if len(mesh_list) == 0:
                     continue
                 combined_mesh = trimesh.util.concatenate(mesh_list)
-                uvs = []
-                for vertex in combined_mesh.vertices:
-                    uv = [vertex[0], vertex[1]]
-                    uvs.append(uv)
-                uvs = np.array(uvs)
-                uvs = (uvs - np.min(uvs)) / (np.max(uvs) - np.min(uvs))
-                uvs *= 20
-                combined_mesh.visual.uvs = uvs
+                
+                # uv for texturing
+                combined_mesh = uv_texturing(combined_mesh, scale=UV_SCLAE)
                 self.all_region_list[i].import_mesh('mesh', combined_mesh)
                 sim_utils.bind_visual_material(f'/World/NonWalkable_{i:03d}', f'/World/Looks/terrain_non_walkable_material_list_{i:03d}')
                 sim_utils.bind_physics_material(f'/World/NonWalkable_{i:03d}', f'/World/Looks/terrain_non_walkable_material_list_{i:03d}')
                 prim = stage.GetPrimAtPath(Sdf.Path(f'/World/NonWalkable_{i:03d}/Environment'))
                 prim.SetActive(False)
+            
+            # Remove ground plane
             for i in range(max(len(self.all_region_list), len(self.walkable_terrain_list))):
                 try:
                     prim = stage.GetPrimAtPath(Sdf.Path(f'/World/NonWalkable_{i:03d}/Environment'))
@@ -881,7 +731,6 @@ class UrbanScene(InteractiveScene):
             prim = stage.GetPrimAtPath(Sdf.Path(f'/World/ground/Environment'))
             prim.SetActive(False)
             
-        
         # static objects
         if generation_cfg['type'] == 'static' or  generation_cfg['type'] == 'dynamic':
             num_objects = generation_cfg['num_object']
@@ -893,14 +742,14 @@ class UrbanScene(InteractiveScene):
             all_assets = os.listdir(asset_root_path)
             all_assets = [i for i in all_assets if 'non_metric' not in i]
             import yaml
-            with open('metaurban_modified/asset_config.yaml', "r") as file:
+            with open('./assets/asset_config.yaml', "r") as file:
                 asset_config = yaml.safe_load(file)
             asset_types = asset_config['type']
             asset_types_mapping = {}
             for k, v in asset_types.items():
                 for sub_k in v.keys():
                     asset_types_mapping[sub_k] = k + '_' + sub_k
-            valid_assets = os.listdir('metaurban_modified/metaurban/assets/adj_parameter_folder/')
+            valid_assets = os.listdir('./assets/adj_parameter_folder/')
             # spawn all static objects in one dataset
             asset_buildings = [a for a in all_assets if 'building' in a.lower()]
             asset_not_buildings = [a for a in all_assets if a not in asset_buildings]
@@ -918,7 +767,7 @@ class UrbanScene(InteractiveScene):
                         break
                 if not asset_valid:
                     continue
-                param_path = 'metaurban_modified/metaurban/assets/adj_parameter_folder/' + asset_path
+                param_path = './assets/adj_parameter_folder/' + asset_path
                 obj_info = json.load(open(param_path, 'rb'))
                 prim_path = asset_path[:-5].replace('-', '_')
                 proto_prim_path = f"/World/Dataset/Object_{prim_path}"
@@ -928,8 +777,6 @@ class UrbanScene(InteractiveScene):
                     rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
                     mass_props=sim_utils.MassPropertiesCfg(mass=min(obj_info.get('mass', 1000), 1000)),
                     collision_props=sim_utils.CollisionPropertiesCfg(),
-                    
-                    # init_state=RigidObjectCfg.InitialStateCfg(pos=(0., 0., ),rot=(0.707, 0.707,0.0,0.0))
                 )
                 prim = proto_asset_config.func(proto_prim_path, proto_asset_config)
                 prim.SetInstanceable(True)
@@ -975,13 +822,26 @@ class UrbanScene(InteractiveScene):
                 
                 # PG: buildings & objects
                 buildings = []
-                building_positions = []
                 objects = []
                 object_positions = []
-                for _ in range(num_objects * 1):
+                if generation_cfg['type'] == 'dynamic':
+                    print(f'[INFO] Using dynamic pedestrians in the scene, the objects will not be placed in centeric regions.')
+                for n_obj in range(num_objects):
+                    try_times = 0
                     while True:
+                        try_times += 1
+                        if try_times > 20:
+                            print(f"[Warning] Failed to generate object after {try_times} tries.")
+                            break
                         random_x = np.random.uniform(tmp_origin[env_idx, 0] + 1, tmp_origin[env_idx, 0] + area_size[0])
                         random_y = np.random.uniform(tmp_origin[env_idx, 1] + 1, tmp_origin[env_idx, 1] + area_size[1])
+                        if generation_cfg['type'] == 'dynamic':
+                            if np.random.rand() < 0.5:
+                                random_x = np.random.uniform(tmp_origin[env_idx, 0] + 1, tmp_origin[env_idx, 0] + area_size[0])
+                                random_y = np.random.uniform(tmp_origin[env_idx, 1] + 1, tmp_origin[env_idx, 1] + area_size[1] / 4)
+                            else:
+                                random_x = np.random.uniform(tmp_origin[env_idx, 0] + 1, tmp_origin[env_idx, 0] + area_size[0])
+                                random_y = np.random.uniform(tmp_origin[env_idx, 1] + area_size[1] * 3 / 4, tmp_origin[env_idx, 1] + area_size[1] - 1)
                         point = Point(random_x, random_y)
                         if polygon_boundary.contains(point):
                             flag = False
@@ -1027,7 +887,6 @@ class UrbanScene(InteractiveScene):
                 proto_prim_paths_no_building = [p for p in proto_prim_paths_no_building if 'wall' not in p[0].lower()]
                 for obj_idx, pos in enumerate(object_positions):
                     proto_prim_path_i = np.random.choice([i for i in range(len(proto_prim_paths_no_building))])
-
                     if not hasattr(self, 'random_p_list'):
                         self.random_p_list = [
                             [
@@ -1039,7 +898,7 @@ class UrbanScene(InteractiveScene):
                     prim_path = proto_prim_path[0].replace('/World/Dataset/Object_', '')
                     obj_info = proto_prim_path[1]
                     prim_path=f"/World/envs/env_{env_idx}/" + f"Object_{prim_path}" + f'{obj_idx:04d}'
-                    obj_prim_path_list.append([prim_path, (pos[0] - tmp_origin[env_idx, 0] + obj_info['pos0'],pos[1] - tmp_origin[env_idx, 1] + obj_info['pos1'], 2.11 + obj_info['pos2']), (0.707, 0.707,0.0,0.0)])
+                    obj_prim_path_list.append([prim_path, (pos[0] - tmp_origin[env_idx, 0] + obj_info['pos0'],pos[1] - tmp_origin[env_idx, 1] + obj_info['pos1'], mesh_block_height + obj_info['pos2']), (0.707, 0.707,0.0,0.0)])
                     prim_path_list.append(prim_path)
                     obj_position_list.append(
                         [
@@ -1063,8 +922,12 @@ class UrbanScene(InteractiveScene):
     
         # dynamic objects
         if generation_cfg['type'] == 'dynamic':
-            add_reference_to_stage(usd_path="actions/synbody_idle426.fbx/synbody_idle426.fbx.usd", prim_path="/World/run")
-            add_reference_to_stage(usd_path="actions/synbody_walking426.fbx/synbody_walking426.fbx.usd", prim_path="/World/walk")
+            self.use_dynamic_pedestrians = True
+            print(f'[INFO] use_dynamic_pedestrians->True: Using dynamic pedestrians in the scene.')
+            self.dynamic_asset_animatable_state()
+            print('[INFO] dynamic asset animatable state is set.')
+            
+            # register the Pedestrian dataset cache
             prims_utils.create_prim("/World/DatasetDynamic", "Scope")
             dynamic_proto_prim_paths = list()
 
@@ -1102,16 +965,78 @@ class UrbanScene(InteractiveScene):
                 # activate rigid body contact sensors
                 if hasattr(proto_asset_config, "activate_contact_sensors") and proto_asset_config.activate_contact_sensors:
                     sim_utils.activate_contact_sensors(proto_prim_path, proto_asset_config.activate_contact_sensors)
+            
             human_prim_path_list = []
-            for human_idx in range(generation_cfg['num_pedestrian']):
-                prim_path=f"/World/envs/env_{env_idx}/" + f"Dynamic_" + f'{human_idx:04d}'
-                random_x = np.random.uniform(tmp_origin[env_idx, 0] + 1, tmp_origin[env_idx, 0] + area_size[0])
-                random_y = np.random.uniform(tmp_origin[env_idx, 1] + 1, tmp_origin[env_idx, 1] + area_size[1])
-                human_prim_path_list.append(
+            # split to int(sqrt(n) + 1) y-direction regions, for example:  n = 16
+            # [1/4, 3/8, 1/2, 5/8, 3/4]
+            # split to int(sqrt(n) + 1)  x-direction regions, for example:  n = 16
+            # [0, 1/4, 1/2, 3/4, 1]
+            # p <= 0.5: -> towards x
+            num_pedestrian = generation_cfg['num_pedestrian']
+            grid_split = int(math.sqrt(num_pedestrian) + 0.5) + 1
+
+            x_bins = np.linspace(0, 1, grid_split)  # [0, 0.25, 0.5, 0.75, 1.0]
+            x_start_left = x_bins[:-1]  # [0, 0.25, 0.5, 0.75]
+            y_bins = np.linspace(0.25, 0.75, grid_split)  # [0, 0.25, 0.5, 0.75, 1.0]
+            y_start_left = y_bins[:-1]  # [0.25, 0.5, 0.75, 1.0]
+            pedestrian_forward_backward_heading_list = []
+            pedestrain_forward_start_end_pos_list = []
+            for env_idx in range(self.num_envs):
+                for human_idx in range(num_pedestrian):
+                    prim_path=f"/World/envs/env_{env_idx}/" + f"Dynamic_" + f'{human_idx:04d}'
+                    grid_i = human_idx // (grid_split - 1)
+                    grid_j = human_idx % (grid_split - 1)
+                    grid_i = min(grid_i, len(x_start_left) - 1)
+                    grid_j = min(grid_j, len(y_start_left) - 1)
+                    start_x = x_start_left[grid_i] * area_size[0]
+                    start_y = y_start_left[grid_j] * area_size[1]
+                    
+                    from scipy.spatial.transform import Rotation as R
+                    if np.random.rand() < 0.5:
+                        direction = 'y+'
+                        delta_rot = np.pi
+                    else:
+                        direction = 'x+'
+                        delta_rot = np.pi / 2
+                    delta_rotation = R.from_euler('y', delta_rot)
+                    default_quat = [0.5, 0.5, 0.5, 0.5] 
+                    rotation = R.from_quat(default_quat)
+                    # Apply the heading rotation to the current rotation
+                    new_rotation =  rotation * delta_rotation
+                    new_quat = new_rotation.as_quat()
+                    qw, qx, qy, qz = new_quat[3], new_quat[0], new_quat[1], new_quat[2]
+                    
+                    delta_rotation = R.from_euler('y', delta_rot - np.pi)
+                    # Apply the heading rotation to the current rotation
+                    new_rotation =  rotation * delta_rotation
+                    new_quat = new_rotation.as_quat()
+                    qw_inv, qx_inv, qy_inv, qz_inv = new_quat[3], new_quat[0], new_quat[1], new_quat[2]
+                    pedestrian_forward_backward_heading_list.append(
                         [
-                            np.random.choice(dynamic_proto_prim_paths), prim_path, [random_x, random_y, 2.11 + 1.25], (0.5, 0.5, 0.5, 0.5)
+                            [qw, qx, qy, qz],  # forward heading
+                            [qw_inv, qx_inv, qy_inv, qz_inv]  # backward heading
                         ]
                     )
+                    if direction == 'y+':
+                        pedestrain_forward_start_end_pos_list.append(
+                            [
+                                [start_x, start_y, 1.30],  # forward start position
+                                [start_x, start_y + area_size[1] * (y_start_left[1] - y_start_left[0]) * 0.7, 1.30]  # forward end position
+                            ]
+                        )
+                    elif direction == 'x+':
+                        pedestrain_forward_start_end_pos_list.append(
+                            [
+                                [start_x, start_y, 1.30],  # forward start position
+                                [start_x + area_size[0] * (x_start_left[1] - x_start_left[0]) * 0.7, start_y, 1.30]  # forward end position
+                            ]
+                        )
+                    
+                    human_prim_path_list.append(
+                            [
+                                np.random.choice(dynamic_proto_prim_paths), prim_path, [start_x, start_y, 1.30], (qw, qx, qy, qz)
+                            ]
+                        )
             all_human_config = RigidObjectCfg(
                 prim_path="/World/envs/env_*/Dynamic_*",
                 spawn=DiversHumanCfg(
@@ -1124,24 +1049,22 @@ class UrbanScene(InteractiveScene):
                 self._global_prim_paths += asset_paths
             self._rigid_objects['all_human_config'] = all_human_config.class_type(all_human_config)
             
-            timeline = omni.timeline.get_timeline_interface()
-            timeline.set_start_time(0)
-            timeline.set_end_time(1.1)
-            timeline.set_target_framerate(15)
-            timeline.set_looping(True)
-            for human_idx in range(generation_cfg['num_pedestrian']):
-                prim_path=f"/World/envs/env_0/" + f"Dynamic_" + f'{human_idx:04d}'
-                mesh_prim = stage.GetPrimAtPath(prim_path)
-                UsdSkel.BindingAPI.Apply(mesh_prim)
-                mesh_binding_api = UsdSkel.BindingAPI(mesh_prim)
-                rel =  mesh_binding_api.CreateAnimationSourceRel()
-                rel.ClearTargets(True)
-                if np.random.rand() > 0.5:
-                    rel.AddTarget("/World/run/SMPLX_neutral/root/pelvis0/SMPLX_neutral_Scene")
-                else:
+            # buffer
+            self.pedestrian_forward_backward_heading_list = pedestrian_forward_backward_heading_list
+            self.pedestrian_forward_start_end_pos_list = pedestrain_forward_start_end_pos_list
+            self.human_prim_path_list = human_prim_path_list
+            
+            for env_idx in range(self.num_envs):
+                for human_idx in range(generation_cfg['num_pedestrian']):
+                    prim_path=f"/World/envs/env_{env_idx}/" + f"Dynamic_" + f'{human_idx:04d}'
+                    mesh_prim = stage.GetPrimAtPath(prim_path + '/root/pelvis0/Skeleton')
+                    UsdSkel.BindingAPI.Apply(mesh_prim)
+                    mesh_binding_api = UsdSkel.BindingAPI(mesh_prim)
+                    rel =  mesh_binding_api.CreateAnimationSourceRel()
+                    rel.ClearTargets(True)
                     rel.AddTarget("/World/walk/SMPLX_neutral/root/pelvis0/SMPLX_neutral_Scene")
         
-        # deactivate some prim
+        # deactivate some prims
         stage = omni.usd.get_context().get_stage()
         prim = stage.GetPrimAtPath(Sdf.Path(f'/World/ground/Environment'))
         prim.SetActive(False)
@@ -1156,7 +1079,10 @@ class UrbanScene(InteractiveScene):
         random.seed(generation_cfg['seed'])
         # ground plane
         tmp_origin = self._default_env_origins[..., :2].reshape(self.num_envs, 2).cpu().numpy()
-        if (generation_cfg['type'] == 'map' or  generation_cfg['type'] == 'static' or  generation_cfg['type'] == 'dynamic') and not self.only_create_assets:
+        mesh_block_height = 0.01
+        if generation_cfg['type'] == 'clean' or \
+           generation_cfg['type'] == 'static' or \
+           generation_cfg['type'] == 'dynamic':
             area_size = [area_size, area_size]
             
             polygon_points = []
@@ -1165,24 +1091,49 @@ class UrbanScene(InteractiveScene):
             polyline_points_list = []
             
             for env_idx in range(self.num_envs):
-                torch.manual_seed(generation_cfg['seed'] + env_idx)
-                np.random.seed(generation_cfg['seed'] + env_idx)
-                random.seed(generation_cfg['seed'] + env_idx)
-                        
                 buffer_width = generation_cfg['buffer_width']
                 x, y = generate_random_road(area_size)
                 x, y = np.array(x), np.array(y)
+                
                 x += tmp_origin[env_idx, 0]
                 y += tmp_origin[env_idx, 1]
                 x = x.clip(tmp_origin[env_idx, 0], tmp_origin[env_idx, 0] + area_size[0])
                 y = y.clip(tmp_origin[env_idx, 1], tmp_origin[env_idx, 1] + area_size[1])
-                mesh, boundary_points, polyline_points = get_road_trimesh(x, y, area_size, boundary=(tmp_origin[env_idx, 1], tmp_origin[env_idx, 1] + area_size[1]), height=0.03)
+                
+                # walkable regions
+                mesh, boundary_points, polyline_points = get_road_trimesh(x, y, area_size, boundary=(tmp_origin[env_idx, 1], tmp_origin[env_idx, 1] + area_size[1]), height=mesh_block_height+0.02)
                 polyline_points_list.append(polyline_points)
                 polygon_points.append([x, y, boundary_points[0], boundary_points[1]])
+                
+                # non walkable regions
                 area_polygon = np.array([(0, 0), (0, area_size[1] + buffer_width), (area_size[0] + buffer_width, area_size[1] + buffer_width), (area_size[0] + buffer_width, 0)]).astype(float)
                 area_polygon[:, 0] += tmp_origin[env_idx, 0]
                 area_polygon[:, 1] += tmp_origin[env_idx, 1]
-                area_mesh = trimesh.creation.extrude_polygon(Polygon(area_polygon), height=0.01)
+                area_mesh = trimesh.creation.extrude_polygon(Polygon(area_polygon), height=mesh_block_height)
+                
+                # boundary polygons
+                if generation_cfg.get('with_boundary', False):
+                    boundary = np.array([(0, -0.5), (0, 0.0), (area_size[0] + 0.5, 0.0), (area_size[0] + 0.5, -0.5)]).astype(float)
+                    boundary[:, 0] += tmp_origin[env_idx, 0]
+                    boundary[:, 1] += tmp_origin[env_idx, 1]
+                    boundary_mesh = trimesh.creation.extrude_polygon(Polygon(boundary), height=mesh_block_height * 10)
+                    all_region_polygon_list[(generation_cfg['non_walkable_seed'] + env_idx) % len(all_region_polygon_list)].append(boundary_mesh)
+                    boundary = np.array([(0, area_size[1]), (0, area_size[1] + 0.5), (area_size[0] + 0.5, area_size[1] + 0.5), (area_size[0] + 0.5, area_size[1])]).astype(float)
+                    boundary[:, 0] += tmp_origin[env_idx, 0]
+                    boundary[:, 1] += tmp_origin[env_idx, 1]
+                    boundary_mesh = trimesh.creation.extrude_polygon(Polygon(boundary), height=mesh_block_height * 10)
+                    all_region_polygon_list[(generation_cfg['non_walkable_seed'] + env_idx) % len(all_region_polygon_list)].append(boundary_mesh)
+                    
+                    boundary = np.array([(-0.5, 0.0), (0, 0.0), (0.0, area_size[1] + 0.5), (-0.5, area_size[1] + 0.5)]).astype(float)
+                    boundary[:, 0] += tmp_origin[env_idx, 0]
+                    boundary[:, 1] += tmp_origin[env_idx, 1]
+                    boundary_mesh = trimesh.creation.extrude_polygon(Polygon(boundary), height=mesh_block_height * 10)
+                    all_region_polygon_list[(generation_cfg['non_walkable_seed'] + env_idx) % len(all_region_polygon_list)].append(boundary_mesh)
+                    boundary = np.array([(area_size[0], 0.0), (area_size[0] + 0.5, 0.0), (area_size[0] + 0.5, area_size[1] + 0.5), (area_size[0], area_size[1] + 0.5)]).astype(float)
+                    boundary[:, 0] += tmp_origin[env_idx, 0]
+                    boundary[:, 1] += tmp_origin[env_idx, 1]
+                    boundary_mesh = trimesh.creation.extrude_polygon(Polygon(boundary), height=mesh_block_height * 10)
+                    all_region_polygon_list[(generation_cfg['non_walkable_seed'] + env_idx) % len(all_region_polygon_list)].append(boundary_mesh)
 
                 walkable_region_polygon_list[(generation_cfg['walkable_seed'] + env_idx) % len(walkable_region_polygon_list)].append(mesh)
                 all_region_polygon_list[(generation_cfg['non_walkable_seed'] + env_idx) % len(all_region_polygon_list)].append(area_mesh)
@@ -1194,36 +1145,31 @@ class UrbanScene(InteractiveScene):
                 if len(mesh_list) == 0:
                     continue
                 combined_mesh = trimesh.util.concatenate(mesh_list)
-                uvs = []
-                for vertex in combined_mesh.vertices:
-                    uv = [vertex[0], vertex[1]]
-                    uvs.append(uv)
-                uvs = np.array(uvs)
-                uvs = (uvs - np.min(uvs)) / (np.max(uvs) - np.min(uvs))
-                uvs *= 20
-                combined_mesh.visual.uvs = uvs
+                
+                # uv for texturing
+                combined_mesh = uv_texturing(combined_mesh, scale=UV_SCLAE)
                 self.walkable_terrain_list[i].import_mesh('mesh', combined_mesh)
                 sim_utils.bind_visual_material(f'/World/Walkable_{i:03d}', f'/World/Looks/terrain_walkable_material_list_{i:03d}')
+                sim_utils.bind_physics_material(f'/World/Walkable_{i:03d}', f'/World/Looks/terrain_non_walkable_material_list_{i:03d}')
                 stage = omni.usd.get_context().get_stage()
                 prim = stage.GetPrimAtPath(Sdf.Path(f'/World/Walkable_{i:03d}/Environment'))
                 prim.SetActive(False)
+                
             for i in range(len(all_region_polygon_list)):
                 mesh_list = all_region_polygon_list[i]
                 if len(mesh_list) == 0:
                     continue
                 combined_mesh = trimesh.util.concatenate(mesh_list)
-                uvs = []
-                for vertex in combined_mesh.vertices:
-                    uv = [vertex[0], vertex[1]]
-                    uvs.append(uv)
-                uvs = np.array(uvs)
-                uvs = (uvs - np.min(uvs)) / (np.max(uvs) - np.min(uvs))
-                uvs *= 20
-                combined_mesh.visual.uvs = uvs
+                
+                # uv for texturing
+                combined_mesh = uv_texturing(combined_mesh, scale=UV_SCLAE)
                 self.all_region_list[i].import_mesh('mesh', combined_mesh)
                 sim_utils.bind_visual_material(f'/World/NonWalkable_{i:03d}', f'/World/Looks/terrain_non_walkable_material_list_{i:03d}')
+                sim_utils.bind_physics_material(f'/World/NonWalkable_{i:03d}', f'/World/Looks/terrain_non_walkable_material_list_{i:03d}')
                 prim = stage.GetPrimAtPath(Sdf.Path(f'/World/NonWalkable_{i:03d}/Environment'))
                 prim.SetActive(False)
+            
+            # Remove ground plane
             for i in range(max(len(self.all_region_list), len(self.walkable_terrain_list))):
                 try:
                     prim = stage.GetPrimAtPath(Sdf.Path(f'/World/NonWalkable_{i:03d}/Environment'))
@@ -1239,7 +1185,6 @@ class UrbanScene(InteractiveScene):
             prim = stage.GetPrimAtPath(Sdf.Path(f'/World/ground/Environment'))
             prim.SetActive(False)
             
-        
         # static objects
         if generation_cfg['type'] == 'static' or  generation_cfg['type'] == 'dynamic':
             num_objects = generation_cfg['num_object']
@@ -1251,14 +1196,14 @@ class UrbanScene(InteractiveScene):
             all_assets = os.listdir(asset_root_path)
             all_assets = [i for i in all_assets if 'non_metric' not in i]
             import yaml
-            with open('metaurban_modified/asset_config.yaml', "r") as file:
+            with open('./assets/asset_config.yaml', "r") as file:
                 asset_config = yaml.safe_load(file)
             asset_types = asset_config['type']
             asset_types_mapping = {}
             for k, v in asset_types.items():
                 for sub_k in v.keys():
                     asset_types_mapping[sub_k] = k + '_' + sub_k
-            valid_assets = os.listdir('metaurban_modified/metaurban/assets/adj_parameter_folder/')
+            valid_assets = os.listdir('./assets/adj_parameter_folder/')
             # spawn all static objects in one dataset
             asset_buildings = [a for a in all_assets if 'building' in a.lower()]
             asset_not_buildings = [a for a in all_assets if a not in asset_buildings]
@@ -1276,18 +1221,16 @@ class UrbanScene(InteractiveScene):
                         break
                 if not asset_valid:
                     continue
-                param_path = 'metaurban_modified/metaurban/assets/adj_parameter_folder/' + asset_path
+                param_path = './assets/adj_parameter_folder/' + asset_path
                 obj_info = json.load(open(param_path, 'rb'))
                 prim_path = asset_path[:-5].replace('-', '_')
                 proto_prim_path = f"/World/Dataset/Object_{prim_path}"
                 proto_asset_config = sim_utils.UsdFileCfg(
                     scale=(obj_info['scale'],obj_info['scale'],obj_info['scale']),
                     usd_path=f"assets/usds/{usd_path}",
-                    rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=False),
-                    mass_props=sim_utils.MassPropertiesCfg(mass=min(obj_info.get('mass', 2), 2)),
+                    rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
+                    mass_props=sim_utils.MassPropertiesCfg(mass=min(obj_info.get('mass', 1000), 1000)),
                     collision_props=sim_utils.CollisionPropertiesCfg(),
-                    
-                    # init_state=RigidObjectCfg.InitialStateCfg(pos=(0., 0., ),rot=(0.707, 0.707,0.0,0.0))
                 )
                 prim = proto_asset_config.func(proto_prim_path, proto_asset_config)
                 prim.SetInstanceable(True)
@@ -1322,16 +1265,11 @@ class UrbanScene(InteractiveScene):
                 if hasattr(proto_asset_config, "activate_contact_sensors") and proto_asset_config.activate_contact_sensors:
                     sim_utils.activate_contact_sensors(proto_prim_path, proto_asset_config.activate_contact_sensors)
             obj_prim_path_list = []
-            prim_path_list = []     
+            prim_path_list = []   
             for env_idx in range(self.num_envs):
-                torch.manual_seed(generation_cfg['seed'] + env_idx)
-                np.random.seed(generation_cfg['seed'] + env_idx)
-                random.seed(generation_cfg['seed'] + env_idx)
-                
                 obj_position_list = []
-                polygon_xy_in_world = self.polygon_points[env_idx]
-                if not isinstance(area_size, list):
-                    area_size = [area_size, area_size]
+                object_positions = []  
+                polygon_xy_in_world = polygon_points[env_idx]
                 x, y, upper, lower = polygon_xy_in_world[0], polygon_xy_in_world[1], polygon_xy_in_world[2], polygon_xy_in_world[3]
                 buffer_width = 1.
                 polyline_boundary = np.concatenate([np.column_stack((polygon_xy_in_world[0], upper + buffer_width)), np.column_stack((x[::-1], lower[::-1] - buffer_width))])
@@ -1339,91 +1277,29 @@ class UrbanScene(InteractiveScene):
                 
                 # PG: buildings & objects
                 buildings = []
-                building_positions = []
                 objects = []
-                object_positions = []
-                for ni in range(num_objects * 1):
+                if generation_cfg['type'] == 'dynamic':
+                    print(f'[INFO] Using dynamic pedestrians in the scene, the objects will not be placed in centeric regions.')
+                for n_obj in range(num_objects):
+                    try_times = 0
                     while True:
-                        random_x = np.random.uniform(tmp_origin[env_idx, 0] + 3, tmp_origin[env_idx, 0] + area_size[0])
-                        random_y = np.random.uniform(tmp_origin[env_idx, 1] + 3, tmp_origin[env_idx, 1] + area_size[1])
-                        # point = Point(random_x, random_y)
-                        # if polygon_boundary.contains(point):
-                        #     flag = False
-                        #     if len(objects) > 0:
-                        #         for obj_cur in objects:
-                        #             obj_position = [random_x, random_y, 0]
-                        #             obj = trimesh.primitives.Sphere(radius=buffer_width, center=obj_position)
-                        #             if not obj.intersection(obj_cur).vertices.shape[0] and not obj_cur.intersection(obj).vertices.shape[0]:
-                        #                 objects.append(obj)
-                        #                 object_positions.append(obj_position)
-                        #                 flag = True
-                        #                 break
-                        #     else:
-                        #         obj_position = [random_x, random_y, 0]
-                        #         obj = trimesh.primitives.Sphere(radius=buffer_width, center=obj_position)
-                        #         objects.append(obj)
-                        #         object_positions.append(obj_position)
-                        #         flag = True
-                        #     if flag:
-                        #         break
-                        if int(area_size[0]) == 30 and num_objects == 30:
-                            if ni < 10:
-                                random_x = tmp_origin[env_idx, 0] + 5.0 + ni * 2.5 # 2.
-                                random_y = np.random.uniform(tmp_origin[env_idx, 1] + 10, tmp_origin[env_idx, 1] + 20) # 15 17.5
-                            elif ni < 20:
-                                random_x = tmp_origin[env_idx, 0] + 5.0 + (ni - 10) * 2.5
-                                random_y = np.random.uniform(tmp_origin[env_idx, 1] + 0, tmp_origin[env_idx, 1] + 10)
+                        try_times += 1
+                        if try_times > 20:
+                            print(f"[Warning] Failed to generate object after {try_times} tries.")
+                            break
+                        random_x = np.random.uniform(tmp_origin[env_idx, 0] + 1, tmp_origin[env_idx, 0] + area_size[0])
+                        random_y = np.random.uniform(tmp_origin[env_idx, 1] + 1, tmp_origin[env_idx, 1] + area_size[1])
+                        if generation_cfg['type'] == 'dynamic':
+                            if np.random.rand() < 0.5:
+                                random_x = np.random.uniform(tmp_origin[env_idx, 0] + 1, tmp_origin[env_idx, 0] + area_size[0])
+                                random_y = np.random.uniform(tmp_origin[env_idx, 1] + 1, tmp_origin[env_idx, 1] + area_size[1] / 4)
                             else:
-                                random_x = tmp_origin[env_idx, 0] + 5.0 + (ni - 20) * 2.5
-                                random_y = np.random.uniform(tmp_origin[env_idx, 1] + 20, tmp_origin[env_idx, 1] + 30)
-                        elif int(area_size[0]) == 30 and num_objects == 60:
-                            if ni < 20:
-                                random_x = tmp_origin[env_idx, 0] + 5.0 + ni * 1.
-                                random_y = np.random.uniform(tmp_origin[env_idx, 1] + 10, tmp_origin[env_idx, 1] + 20)
-                            elif ni < 40:
-                                random_x = tmp_origin[env_idx, 0] + 5.0 + (ni - 20) * 1.2
-                                random_y = np.random.uniform(tmp_origin[env_idx, 1] + 0, tmp_origin[env_idx, 1] + 10)
-                            else:
-                                random_x = tmp_origin[env_idx, 0] + 5.0 + (ni - 40) * 1.2
-                                random_y = np.random.uniform(tmp_origin[env_idx, 1] + 20, tmp_origin[env_idx, 1] + 30)
-                        elif int(area_size[0]) == 30:
-                            if ni < 10:
-                                random_x = tmp_origin[env_idx, 0] + 5.0 + ni * 2.5 # 2.
-                                random_y = np.random.uniform(tmp_origin[env_idx, 1] + 0, tmp_origin[env_idx, 1] + 10) # 15 17.5
-                            elif ni < 20:
-                                random_x = tmp_origin[env_idx, 0] + 5.0 + (ni - 10) * 2.5
-                                random_y = np.random.uniform(tmp_origin[env_idx, 1] + 20, tmp_origin[env_idx, 1] + 30)
-                            else:
-                                random_x = tmp_origin[env_idx, 0] + 5.0 + ((ni - 20) % 10) * 2.
-                                random_y = np.random.uniform(tmp_origin[env_idx, 1] + 8, tmp_origin[env_idx, 1] + 22)
-                        # if ni == 0:
-                        #     random_x = np.random.uniform(tmp_origin[env_idx, 0] + 15, tmp_origin[env_idx, 0] + 25)
-                        #     random_y = np.random.uniform(tmp_origin[env_idx, 1] + 15, tmp_origin[env_idx, 1] + 20)
-                        # if ni == 1:
-                        #     random_x = np.random.uniform(tmp_origin[env_idx, 0] + 10, tmp_origin[env_idx, 0] + 15)
-                        #     random_y = np.random.uniform(tmp_origin[env_idx, 1] + 15, tmp_origin[env_idx, 1] + 25)
-                        # if ni == 2:
-                        #     random_x = np.random.uniform(tmp_origin[env_idx, 0] + 10, tmp_origin[env_idx, 0] + 15)
-                        #     random_y = np.random.uniform(tmp_origin[env_idx, 1] + 3, tmp_origin[env_idx, 1] + 10)
-                        # if ni == 3:
-                        #     random_x = np.random.uniform(tmp_origin[env_idx, 0] + 15, tmp_origin[env_idx, 0] + 20)
-                        #     random_y = np.random.uniform(tmp_origin[env_idx, 1] + 10, tmp_origin[env_idx, 1] + 15)
-                        # if ni == 0:
-                        #     random_x = np.random.uniform(tmp_origin[env_idx, 0] + 3, tmp_origin[env_idx, 0] + 5)
-                        #     random_y = np.random.uniform(tmp_origin[env_idx, 1] + 4, tmp_origin[env_idx, 1] + 5)
-                        # if ni == 1:
-                        #     random_x = np.random.uniform(tmp_origin[env_idx, 0] + 7, tmp_origin[env_idx, 0] + 8)
-                        #     random_y = np.random.uniform(tmp_origin[env_idx, 1] + 0, tmp_origin[env_idx, 1] + 2)
-                        # if ni == 2:
-                        #     random_x = np.random.uniform(tmp_origin[env_idx, 0] + 7, tmp_origin[env_idx, 0] + 8)
-                        #     random_y = np.random.uniform(tmp_origin[env_idx, 1] + 7, tmp_origin[env_idx, 1] + 9)
-                        # if ni == 3:
-                        #     random_x = np.random.uniform(tmp_origin[env_idx, 0] + 9, tmp_origin[env_idx, 0] + 10)
-                        #     random_y = np.random.uniform(tmp_origin[env_idx, 1] + 3, tmp_origin[env_idx, 1] + 6)
-                        #point = Point(random_x, random_y)
-                        if True:#polygon_boundary.contains(point):
-                            flag = True#False
-                            if False:#len(objects) > 0:
+                                random_x = np.random.uniform(tmp_origin[env_idx, 0] + 1, tmp_origin[env_idx, 0] + area_size[0])
+                                random_y = np.random.uniform(tmp_origin[env_idx, 1] + area_size[1] * 3 / 4, tmp_origin[env_idx, 1] + area_size[1] - 1)
+                        point = Point(random_x, random_y)
+                        if polygon_boundary.contains(point):
+                            flag = False
+                            if len(objects) > 0:
                                 for obj_cur in objects:
                                     obj_position = [random_x, random_y, 0]
                                     obj = trimesh.primitives.Sphere(radius=buffer_width, center=obj_position)
@@ -1434,8 +1310,8 @@ class UrbanScene(InteractiveScene):
                                         break
                             else:
                                 obj_position = [random_x, random_y, 0]
-                                #obj = trimesh.primitives.Sphere(radius=buffer_width, center=obj_position)
-                                #objects.append(obj)
+                                obj = trimesh.primitives.Sphere(radius=buffer_width, center=obj_position)
+                                objects.append(obj)
                                 object_positions.append(obj_position)
                                 flag = True
                             if flag:
@@ -1471,10 +1347,8 @@ class UrbanScene(InteractiveScene):
                 proto_prim_paths_no_building = [p for p in proto_prim_paths if 'building' not in p[0].lower()]
                 proto_prim_paths_no_building = [p for p in proto_prim_paths_no_building if 'tree' not in p[0].lower()]
                 proto_prim_paths_no_building = [p for p in proto_prim_paths_no_building if 'wall' not in p[0].lower()]
-                proto_prim_paths_no_building = [p for p in proto_prim_paths_no_building if 'vege' not in p[0].lower()]
                 for obj_idx, pos in enumerate(object_positions):
                     proto_prim_path_i = np.random.choice([i for i in range(len(proto_prim_paths_no_building))])
-
                     if not hasattr(self, 'random_p_list'):
                         self.random_p_list = [
                             [
@@ -1486,7 +1360,7 @@ class UrbanScene(InteractiveScene):
                     prim_path = proto_prim_path[0].replace('/World/Dataset/Object_', '')
                     obj_info = proto_prim_path[1]
                     prim_path=f"/World/envs/env_{env_idx}/" + f"Object_{prim_path}" + f'{obj_idx:04d}'
-                    obj_prim_path_list.append([prim_path, (pos[0] - tmp_origin[env_idx, 0] + obj_info['pos0'],pos[1] - tmp_origin[env_idx, 1] + obj_info['pos1'], 0.05 + obj_info['pos2']), (0.707, 0.707,0.0,0.0)])
+                    obj_prim_path_list.append([prim_path, (pos[0] - tmp_origin[env_idx, 0] + obj_info['pos0'],pos[1] - tmp_origin[env_idx, 1] + obj_info['pos1'], mesh_block_height + obj_info['pos2']), (0.707, 0.707,0.0,0.0)])
                     prim_path_list.append(prim_path)
                     obj_position_list.append(
                         [
@@ -1510,589 +1384,403 @@ class UrbanScene(InteractiveScene):
     
         # dynamic objects
         if generation_cfg['type'] == 'dynamic':
-            pass
+            self.use_dynamic_pedestrians = True
+            print(f'[INFO] use_dynamic_pedestrians->True: Using dynamic pedestrians in the scene.')
+            self.dynamic_asset_animatable_state()
+            print('[INFO] dynamic asset animatable state is set.')
+            
+            # register the Pedestrian dataset cache
+            prims_utils.create_prim("/World/DatasetDynamic", "Scope")
+            dynamic_proto_prim_paths = list()
+
+            for human_id, human_info in enumerate(self.unique_dynamic_asset_path):
+                proto_prim_path = f"/World/DatasetDynamic/Human_{human_id:04d}"
+                proto_asset_config = sim_utils.UsdFileCfg(
+                    scale=(0.01, 0.01, 0.01),
+                    usd_path=human_info,
+                )
+                prim = proto_asset_config.func(proto_prim_path, proto_asset_config)
+                # save the proto prim path
+                dynamic_proto_prim_paths.append(proto_prim_path)
+                # set the prim visibility
+                if hasattr(proto_asset_config, "visible"):
+                    imageable = UsdGeom.Imageable(prim)
+                    if proto_asset_config.visible:
+                        imageable.MakeVisible()
+                    else:
+                        imageable.MakeInvisible()
+                # set the semantic annotations
+                if hasattr(proto_asset_config, "semantic_tags") and proto_asset_config.semantic_tags is not None:
+                    # note: taken from replicator scripts.utils.utils.py
+                    for semantic_type, semantic_value in proto_asset_config.semantic_tags:
+                        # deal with spaces by replacing them with underscores
+                        semantic_type_sanitized = semantic_type.replace(" ", "_")
+                        semantic_value_sanitized = semantic_value.replace(" ", "_")
+                        # set the semantic API for the instance
+                        instance_name = f"{semantic_type_sanitized}_{semantic_value_sanitized}"
+                        sem = Semantics.SemanticsAPI.Apply(prim, instance_name)
+                        # create semantic type and data attributes
+                        sem.CreateSemanticTypeAttr()
+                        sem.CreateSemanticDataAttr()
+                        sem.GetSemanticTypeAttr().Set(semantic_type)
+                        sem.GetSemanticDataAttr().Set(semantic_value)
+                # activate rigid body contact sensors
+                if hasattr(proto_asset_config, "activate_contact_sensors") and proto_asset_config.activate_contact_sensors:
+                    sim_utils.activate_contact_sensors(proto_prim_path, proto_asset_config.activate_contact_sensors)
+            
+            human_prim_path_list = []
+            # split to int(sqrt(n) + 1) y-direction regions, for example:  n = 16
+            # [1/4, 3/8, 1/2, 5/8, 3/4]
+            # split to int(sqrt(n) + 1)  x-direction regions, for example:  n = 16
+            # [0, 1/4, 1/2, 3/4, 1]
+            # p <= 0.5: -> towards x
+            num_pedestrian = generation_cfg['num_pedestrian']
+            grid_split = int(math.sqrt(num_pedestrian) + 0.5) + 1
+
+            x_bins = np.linspace(0, 1, grid_split)  # [0, 0.25, 0.5, 0.75, 1.0]
+            x_start_left = x_bins[:-1]  # [0, 0.25, 0.5, 0.75]
+            y_bins = np.linspace(0.25, 0.75, grid_split)  # [0, 0.25, 0.5, 0.75, 1.0]
+            y_start_left = y_bins[:-1]  # [0.25, 0.5, 0.75, 1.0]
+            pedestrian_forward_backward_heading_list = []
+            pedestrain_forward_start_end_pos_list = []
+            for env_idx in range(self.num_envs):
+                np.random.seed(env_idx)
+                for human_idx in range(num_pedestrian):
+                    prim_path=f"/World/envs/env_{env_idx}/" + f"Dynamic_" + f'{human_idx:04d}'
+                    grid_i = human_idx // (grid_split - 1)
+                    grid_j = human_idx % (grid_split - 1)
+                    grid_i = min(grid_i, len(x_start_left) - 1)
+                    grid_j = min(grid_j, len(y_start_left) - 1)
+                    start_x = x_start_left[grid_i] * area_size[0]
+                    start_y = y_start_left[grid_j] * area_size[1]
+                    
+                    from scipy.spatial.transform import Rotation as R
+                    if np.random.rand() < 0.5:
+                        direction = 'y+'
+                        delta_rot = np.pi
+                    else:
+                        direction = 'x+'
+                        delta_rot = np.pi / 2
+                    delta_rotation = R.from_euler('y', delta_rot)
+                    default_quat = [0.5, 0.5, 0.5, 0.5] 
+                    rotation = R.from_quat(default_quat)
+                    # Apply the heading rotation to the current rotation
+                    new_rotation =  rotation * delta_rotation
+                    new_quat = new_rotation.as_quat()
+                    qw, qx, qy, qz = new_quat[3], new_quat[0], new_quat[1], new_quat[2]
+                    
+                    delta_rotation = R.from_euler('y', delta_rot - np.pi)
+                    # Apply the heading rotation to the current rotation
+                    new_rotation =  rotation * delta_rotation
+                    new_quat = new_rotation.as_quat()
+                    qw_inv, qx_inv, qy_inv, qz_inv = new_quat[3], new_quat[0], new_quat[1], new_quat[2]
+                    pedestrian_forward_backward_heading_list.append(
+                        [
+                            [qw, qx, qy, qz],  # forward heading
+                            [qw_inv, qx_inv, qy_inv, qz_inv]  # backward heading
+                        ]
+                    )
+                    if direction == 'y+':
+                        pedestrain_forward_start_end_pos_list.append(
+                            [
+                                [start_x, start_y, 1.30],  # forward start position
+                                [start_x, start_y + area_size[1] * (y_start_left[1] - y_start_left[0]) * 0.8, 1.30]  # forward end position
+                            ]
+                        )
+                    elif direction == 'x+':
+                        pedestrain_forward_start_end_pos_list.append(
+                            [
+                                [start_x, start_y, 1.30],  # forward start position
+                                [start_x + area_size[0] * (x_start_left[1] - x_start_left[0]) * 0.8, start_y, 1.30]  # forward end position
+                            ]
+                        )
+                    
+                    human_prim_path_list.append(
+                            [
+                                np.random.choice(dynamic_proto_prim_paths), prim_path, [start_x, start_y, 1.30], (qw, qx, qy, qz)
+                            ]
+                        )
+            all_human_config = RigidObjectCfg(
+                prim_path="/World/envs/env_*/Dynamic_*",
+                spawn=DiversHumanCfg(
+                    assets_cfg=human_prim_path_list
+                )
+            )
+            all_human_config.prim_path = all_human_config.prim_path.format(ENV_REGEX_NS=self.env_regex_ns)
+            if hasattr(all_human_config, "collision_group") and all_human_config.collision_group == -1:
+                asset_paths = sim_utils.find_matching_prim_paths(all_human_config.prim_path)
+                self._global_prim_paths += asset_paths
+            self._rigid_objects['all_human_config'] = all_human_config.class_type(all_human_config)
+            
+            # buffer
+            self.pedestrian_forward_backward_heading_list = pedestrian_forward_backward_heading_list
+            self.pedestrian_forward_start_end_pos_list = pedestrain_forward_start_end_pos_list
+            self.human_prim_path_list = human_prim_path_list
+            
+            for env_idx in range(self.num_envs):
+                for human_idx in range(generation_cfg['num_pedestrian']):
+                    prim_path=f"/World/envs/env_{env_idx}/" + f"Dynamic_" + f'{human_idx:04d}'
+                    mesh_prim = stage.GetPrimAtPath(prim_path + '/root/pelvis0/Skeleton')
+                    UsdSkel.BindingAPI.Apply(mesh_prim)
+                    mesh_binding_api = UsdSkel.BindingAPI(mesh_prim)
+                    rel =  mesh_binding_api.CreateAnimationSourceRel()
+                    rel.ClearTargets(True)
+                    rel.AddTarget("/World/walk/SMPLX_neutral/root/pelvis0/SMPLX_neutral_Scene")
         
-        # deactivate some prim
+        # deactivate some prims
         stage = omni.usd.get_context().get_stage()
         prim = stage.GetPrimAtPath(Sdf.Path(f'/World/ground/Environment'))
         prim.SetActive(False)
         prim = stage.GetPrimAtPath(Sdf.Path(f'/World/Obstacle_terrain/Environment'))
         prim.SetActive(False)
         
-    
-    def generate_async_procedural_scene(self):
-        # configure the logical engine
-        config = Config(BASE_DEFAULT_CONFIG)
-        config.register_type("map", str, int)
-        config["map_config"].register_type("config", None)
-        config.update(dict(
-            use_render=False, image_observation=False, interface_panel=False,
-            
-            # traffic related
-            show_mid_block_map=False,
-            traffic_mode=TrafficMode.Trigger,
-            random_traffic=False,
-            traffic_density=0.0,
-            traffic_vehicle_config=dict(
-            show_navi_mark=False,
-            show_dest_mark=False,
-            enable_reverse=False,
-            show_lidar=False,
-            show_lane_line_detector=False,
-            show_side_detector=False,),
-            
-             # pedestrian related
-            spawn_human_num=1,
-            spawn_wheelchairman_num=0,
-            spawn_edog_num = 0,
-            spawn_erobot_num=0,
-            spawn_drobot_num=0,
-            max_actor_num=1,))
-        default_config_copy = Config(config, unchangeable=True)
-        
-        merged_config = config.update(self.cfg.pg_config, True, ["agent_configs", "sensors"])
-        merged_config["map_config"] = parse_map_config(
-            easy_map_config=config["map"], new_map_config=config["map_config"], default_config=default_config_copy
-        )
-        
-        PG_CONFIG = Config(merged_config, unchangeable=False)
-        
-        cls = BaseEngine
-        cls.singleton = BaseEngine(PG_CONFIG)
-        self.logical_engine = cls.singleton
-        self.logical_engine.register_manager('map_manager', PGMapManager())
-        self.logical_engine.register_manager('asset_manager', AssetManager())
-        # self.logical_engine.register_manager('human_manager', PGBackgroundSidewalkAssetsManager())
-        print(f'[INFO] Logical engine is created.')
-        
-        # reset engine
-        engine = self.logical_engine
-        set_global_random_seed((engine.global_config['reset_seed'] + engine.gets_start_index(engine.global_config)) % engine.global_config['num_scenarios'])
-        engine.reset()
-        print(f'[INFO] Logical engine is reset.')
-        
-        # setup object cache
-        self.setup_object_cache()
-        print(f'[INFO] Object cache is setup.')
-        
-        self.polygons_of_lane = []
-        self.white_line_polygons = []
-        self.yellow_line_polygons = []
-        self.nb_polygons = []
-        self.n_polygons = []
-        self.s_polygons = []
-        self.fb_polygons = []
-        self.f_polygons = []
-        self.h_polygons = []
-        self.obj_prim = []
-        for idx in range(self.num_envs):
-            self.set_sidewalk(engine.global_config['sidewalk_type'])
-            # initialize polygon
-            polyline_polygon_dict = self.set_polyline_polygon()
-            self.polygons_of_lane += [polyline_polygon_dict['polygons']]
-            self.white_line_polygons += [polyline_polygon_dict['white_line_polygons']]
-            self.yellow_line_polygons += [polyline_polygon_dict['lane_yellow_line_polygons']]
-            self.nb_polygons += [polyline_polygon_dict['near_road_buffer_polygons']]
-            self.n_polygons += [polyline_polygon_dict['near_road_sidewalk_polygons']]
-            self.s_polygons += [polyline_polygon_dict['sidewalk_polygons']]
-            self.fb_polygons += [polyline_polygon_dict['far_road_buffer_polygons']]
-            self.f_polygons += [polyline_polygon_dict['far_road_sidewalk_polygons']]
-            self.h_polygons += [polyline_polygon_dict['house_region_polygons']]
-            
-            # generate objects
-            obj_info_dict = self.set_async_objects(idx)
-            obj_prim = obj_info_dict['obj_prim_path_list']
-            self.obj_prim += obj_prim
-            
-            engine.seed(((engine.current_seed + 1) % PG_CONFIG['num_scenarios']) + engine.global_config['start_seed'])
-            engine.reset()
-        all_rigid_objects_config = RigidObjectCfg(
-            prim_path="/World/envs/env_*/Object_*",
-            spawn=DiverseAssetCfg(
-                assets_cfg=self.obj_prim
-            )
-        )
-
-        updated_cfg = copy.deepcopy(self.cfg)
-        updated_cfg.object_cfg_list = all_rigid_objects_config
-        self.cfg = updated_cfg
-        
-        # generate and spawn scene
-        if self._is_scene_setup_from_cfg():
-            # add entities from config
-            self._add_entities_from_cfg(procedural_generation=True)
-            
-            sim_utils.bind_visual_material('/World/Lane', '/World/Looks/LaneMaterial')
-            sim_utils.bind_visual_material('/World/WhiteLine', '/World/Looks/LaneWhiteLineSurfaceMaterial')
-            sim_utils.bind_visual_material('/World/YellowLine', '/World/Looks/LaneYellowLineSurfaceMaterial')
-            sim_utils.bind_visual_material('/World/Sidewalk', '/World/Looks/SidewalkMaterial')
-            sim_utils.bind_visual_material('/World/NearRoad', '/World/Looks/SidewalkNMaterial')
-            sim_utils.bind_visual_material('/World/NearBuffer', '/World/Looks/SidewalkNBMaterial')
-            sim_utils.bind_visual_material('/World/FarFromBuffer', '/World/Looks/SidewalkFBMaterial')
-            sim_utils.bind_visual_material('/World/FarFromRoad', '/World/Looks/SidewalkFMaterial')
-            sim_utils.bind_visual_material('/World/HouseRegion', '/World/Looks/SidewalkHMaterial')
-            
-            stage = omni.usd.get_context().get_stage()
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/ground/Environment'))
-            prim.SetActive(False)
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/Lane/Environment'))
-            prim.SetActive(False)
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/WhiteLine/Environment'))
-            prim.SetActive(False)
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/YellowLine/Environment'))
-            prim.SetActive(False)
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/Sidewalk/Environment'))
-            prim.SetActive(False)
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/NearRoad/Environment'))
-            prim.SetActive(False)
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/NearBuffer/Environment'))
-            prim.SetActive(False)
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/FarFromBuffer/Environment'))
-            prim.SetActive(False)
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/FarFromRoad/Environment'))
-            prim.SetActive(False)
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/HouseRegion/Environment'))
-            prim.SetActive(False)
-    
     def generate_sync_procedural_scene(self):
         # configure the logical engine
-        config = Config(BASE_DEFAULT_CONFIG)
-        config.register_type("map", str, int)
-        config["map_config"].register_type("config", None)
-        config.update(dict(
-            use_render=False, image_observation=False, interface_panel=False,
-            
-            # traffic related
-            show_mid_block_map=False,
-            traffic_mode=TrafficMode.Trigger,
-            random_traffic=False,
-            traffic_density=0.0,
-            traffic_vehicle_config=dict(
-            show_navi_mark=False,
-            show_dest_mark=False,
-            enable_reverse=False,
-            show_lidar=False,
-            show_lane_line_detector=False,
-            show_side_detector=False,),
-            
-             # pedestrian related
-            spawn_human_num=1,
-            spawn_wheelchairman_num=0,
-            spawn_edog_num = 0,
-            spawn_erobot_num=0,
-            spawn_drobot_num=0,
-            max_actor_num=1,
-            
-            walk_on_all_regions=False,
-            ))
-        default_config_copy = Config(config, unchangeable=True)
+        generation_cfg = self.cfg.pg_config
         
-        merged_config = config.update(self.cfg.pg_config, True, ["agent_configs", "sensors"])
-        merged_config["map_config"] = parse_map_config(
-            easy_map_config=config["map"], new_map_config=config["map_config"], default_config=default_config_copy
-        )
+        # set seed
+        seed = generation_cfg.get('seed', 0)
+        os.environ['PYTHONHASHSEED'] = str(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        random.seed(seed)
         
-        PG_CONFIG = Config(merged_config, unchangeable=False)
-        
-        cls = BaseEngine
-        cls.singleton = BaseEngine(PG_CONFIG)
-        self.logical_engine = cls.singleton
-        self.logical_engine.register_manager('map_manager', PGMapManager())
-        if self.logical_engine.global_config['object_density'] > 0:
-            self.logical_engine.register_manager('asset_manager', AssetManager())
-            # self.logical_engine.register_manager('human_manager', PGBackgroundSidewalkAssetsManager())
-        print(f'[INFO] Logical engine is created.')
-        
-        # reset engine
-        engine = self.logical_engine
-        set_global_random_seed((engine.global_config['reset_seed'] + engine.gets_start_index(engine.global_config)) % engine.global_config['num_scenarios'])
-        engine.reset()
-        print(f'[INFO] Logical engine is reset.')
-        
+        # get stage
+        stage = omni.usd.get_context().get_stage()
         # setup object cache
-        # self.setup_object_cache()
-        # print(f'[INFO] Object cache is setup.')
         self.setup_object_dict()
         print(f'[INFO] Object cache is not setup because sync simulation does not need caching but only omniverse mechanism.')
         
         # initialize sidewalk
-        self.set_sidewalk(engine.global_config['sidewalk_type'])
+        self.set_sidewalk(generation_cfg.get('sidewalk_type', 'Narrow Sidewalk'))
         
-        # initialize polygon
-        polyline_polygon_dict = self.set_polyline_polygon()
-        self.polygons_of_lane = [polyline_polygon_dict['polygons'] for _ in range(self.num_envs)]
-        self.white_line_polygons = [polyline_polygon_dict['white_line_polygons'] for _ in range(self.num_envs)]
-        self.yellow_line_polygons = [polyline_polygon_dict['lane_yellow_line_polygons'] for _ in range(self.num_envs)]
-        self.nb_polygons = [polyline_polygon_dict['near_road_buffer_polygons'] for _ in range(self.num_envs)]
-        self.n_polygons = [polyline_polygon_dict['near_road_sidewalk_polygons'] for _ in range(self.num_envs)]
-        self.s_polygons = [polyline_polygon_dict['sidewalk_polygons'] for _ in range(self.num_envs)]
-        self.fb_polygons = [polyline_polygon_dict['far_road_buffer_polygons'] for _ in range(self.num_envs)]
-        self.f_polygons = [polyline_polygon_dict['far_road_sidewalk_polygons'] for _ in range(self.num_envs)]
-        self.h_polygons = [polyline_polygon_dict['house_region_polygons'] for _ in range(self.num_envs)]
+        # generate map
+        from urbansim.scene.procedural_generation.map import generate
+        generate.generate_map_polygon(self, stage, generation_cfg)
         
-        # get mask
-        start_x, start_y = 5., -5.
-        if self.logical_engine.global_config['object_density'] > 0:
-            mask = engine.walkable_regions_mask
-            start_end_regions_mask = engine.start_end_regions_mask
-            mask_translate = engine.mask_translate
-            from metaurban.policy.get_planning import get_planning
-            #start_points, end_points = random_start_and_end_points(mask[:, :, 0], mask_translate, 1, starts_init=[(start_x + mask_translate[0], start_y + mask_translate[1])])
-            start_points, end_points = random_start_and_end_points(start_end_regions_mask[:, :, 0], mask_translate, 1)
-            # start_points = [(start_x + mask_translate[0], start_y + mask_translate[1])]
-            print(f'[INFO] Planning is started: {start_points} -> {end_points}')
-            time_length_lists, nexts_list, speed_list, earliest_stop_pos_list = get_planning(
-                [start_points],
-                
-                [mask],
-                
-                [end_points],
-                
-                [len(start_points)],
-                
-                1
-            )
-            position_list = np.array(nexts_list).reshape(-1, 2)
-            position_list[..., 0] -= mask_translate[0]
-            position_list[..., 1] -= mask_translate[1]
-            print(f'[INFO] Planning is done.')
-            print(f'[INFO] Position: {position_list[0]} -> {position_list[-1]}')
+        # place objects
+        from urbansim.scene.procedural_generation.object import generate
 
-        import matplotlib.pyplot as plt
-        fig, ax = plt.subplots()
-        plt.imshow(np.flipud(mask), origin='lower')   ######
-        ax.scatter([np.array(start_points).reshape(2, )[0]], [np.array(start_points).reshape(2, )[1]], marker='o', color='red')
-        ax.scatter([position_list[0, 0] + mask_translate[0]], [position_list[0, 1] + mask_translate[1]], marker='o')
-        for t in range(len(position_list) // 10):
-            ax.scatter([position_list[min(t * 10, len(position_list) - 1), 0] + mask_translate[0]], [position_list[min(t * 10, len(position_list) - 1), 1] + mask_translate[1]], marker='.', c='green')
-        ax.scatter([position_list[-1, 0] + mask_translate[0]], [position_list[-1, 1] + mask_translate[1]], marker='x')
-        ax.scatter([np.array(end_points).reshape(2, )[0]], [np.array(end_points).reshape(2, )[1]], marker='*', color='red')
-        plt.show()
-        # plt.savefig('./tmp.png')
+        # place pedestrains
+        from urbansim.scene.procedural_generation.pedestrian import generate
         
-        # initialize objects
-        updated_cfg = copy.deepcopy(self.cfg)
-        all_usd_files = os.listdir('assets/usds/')
-        all_json_files = os.listdir('metaurban_modified/metaurban/assets/adj_parameter_folder/')
-        usd_json_dict = {}
-        for file in all_json_files:
-            json_state = json.load(open('metaurban_modified/metaurban/assets/adj_parameter_folder/' + file, 'rb'))
-            try:
-                usd_name = json_state['filename'].replace('.glb', '.usd').replace('-', '_').replace(" ", "")
-            except:
-                # {'TIRE_RADIUS': 0.6, 'TIRE_WIDTH': 0.25, 'MASS': 1100, 'LATERAL_TIRE_TO_CENTER': 1.1953352769679304, 
-                # 'FRONT_WHEELBASE': 2.7690288713910762, 'REAR_WHEELBASE': 2.087126137841352, 'CHASSIS_TO_WHEEL_AXIS': 0.0, 'TIRE_SCALE': 1.8, 'TIRE_OFFSET': -0.5801886792452831, 'MODEL_PATH': 'test/firerelated-aac70737c4f5478ebf9e14387a123214.glb', 'MODEL_SCALE': [1.1236023611051744, 1.1236023611051744, 1.1236023611051744], 'MODEL_OFFSET': [0, 0, -1.5], 'MODEL_HPR': [90.0, 0, 0], 'LENGTH': 7.570067405700684, 'HEIGHT': 3.144643008708954, 'WIDTH': 2.81737744808197, 'general': {'length': 7.570067405700684, 'width': 2.81737744808197, 'height': 3.144643008708954, 'bounding_box': [[3.907700300216675, 1.4086887836456299], [3.907700300216675, -1.4086886644363403], [-3.662367105484009, -1.4086886644363403], [-3.662367105484009, 1.4086887836456299]], 'center': [0.12266659736633301, 5.960464477539063e-08], 'color': 'Red', 'general_type': 'vehicle', 'detail_type': 'FireTruck'}}
-                usd_name = json_state['MODEL_PATH'].replace('.usd', '.usd').replace('-', '_').replace(" ", "").split('/')[-1]
-            usd_json_dict[usd_name] = json_state
-        if engine.global_config['object_density'] > 0:
-            self.sync_obejct_dict = self.set_sync_objects()
-            import pickle
-            with open('./types.pkl', 'rb') as f:
-                types = pickle.load(f)
-            for idx, primpath_usd_pos_rot_scale in enumerate(self.sync_obejct_dict['obj_prim_path_list']):
-                try:
-                    type_selected = [t for t in types if t in primpath_usd_pos_rot_scale[1]][0]
-                except:
-                    type_selected = 'unknown'
-                np.random.seed(engine.global_config.get('instance_seed', 0))
-                if engine.global_config.get('random_re_instance', False):
-                    if 'building' in primpath_usd_pos_rot_scale[1].lower():
-                        pass
-                    else:
-                        try:
-                            files_to_be_selected = [f for f in all_usd_files if type_selected in f and 'non_metric' not in f and f != primpath_usd_pos_rot_scale[1]]
-                            selected_replace_file = np.random.choice(files_to_be_selected)
-                            json_state = usd_json_dict[selected_replace_file]
-                            json_raw_state = usd_json_dict[primpath_usd_pos_rot_scale[1]]
-                            B_orig = np.array(json_raw_state['general']['bounding_box'])
-                            B_new = np.array(json_state['general']['bounding_box'])
-                            W_orig = np.max(B_orig[:, 0]) - np.min(B_orig[:, 0])
-                            H_orig = np.max(B_orig[:, 1]) - np.min(B_orig[:, 1])
+        # PG_CONFIG = Config(merged_config, unchangeable=False)
+        
+        # cls = BaseEngine
+        # cls.singleton = BaseEngine(PG_CONFIG)
+        # self.logical_engine = cls.singleton
+        # self.logical_engine.register_manager('map_manager', PGMapManager())
+        # if self.logical_engine.global_config['object_density'] > 0:
+        #     self.logical_engine.register_manager('asset_manager', AssetManager())
+        #     # self.logical_engine.register_manager('human_manager', PGBackgroundSidewalkAssetsManager())
+        # print(f'[INFO] Logical engine is created.')
+        
+        # # reset engine
+        # engine = self.logical_engine
+        # set_global_random_seed((engine.global_config['reset_seed'] + engine.gets_start_index(engine.global_config)) % engine.global_config['num_scenarios'])
+        # engine.reset()
+        # print(f'[INFO] Logical engine is reset.')
+        
+        # # setup object cache
+        # # self.setup_object_cache()
+        # # print(f'[INFO] Object cache is setup.')
+        # self.setup_object_dict()
+        # print(f'[INFO] Object cache is not setup because sync simulation does not need caching but only omniverse mechanism.')
+        
+        # # initialize sidewalk
+        # self.set_sidewalk(engine.global_config['sidewalk_type'])
+        
+        # # initialize polygon
+        # polyline_polygon_dict = self.set_polyline_polygon()
+        # self.polygons_of_lane = [polyline_polygon_dict['polygons'] for _ in range(self.num_envs)]
+        # self.white_line_polygons = [polyline_polygon_dict['white_line_polygons'] for _ in range(self.num_envs)]
+        # self.yellow_line_polygons = [polyline_polygon_dict['lane_yellow_line_polygons'] for _ in range(self.num_envs)]
+        # self.nb_polygons = [polyline_polygon_dict['near_road_buffer_polygons'] for _ in range(self.num_envs)]
+        # self.n_polygons = [polyline_polygon_dict['near_road_sidewalk_polygons'] for _ in range(self.num_envs)]
+        # self.s_polygons = [polyline_polygon_dict['sidewalk_polygons'] for _ in range(self.num_envs)]
+        # self.fb_polygons = [polyline_polygon_dict['far_road_buffer_polygons'] for _ in range(self.num_envs)]
+        # self.f_polygons = [polyline_polygon_dict['far_road_sidewalk_polygons'] for _ in range(self.num_envs)]
+        # self.h_polygons = [polyline_polygon_dict['house_region_polygons'] for _ in range(self.num_envs)]
+        
+        # # get mask
+        # start_x, start_y = 5., -5.
+        # if self.logical_engine.global_config['object_density'] > 0:
+        #     mask = engine.walkable_regions_mask
+        #     start_end_regions_mask = engine.start_end_regions_mask
+        #     mask_translate = engine.mask_translate
+        #     from metaurban.policy.get_planning import get_planning
+        #     #start_points, end_points = random_start_and_end_points(mask[:, :, 0], mask_translate, 1, starts_init=[(start_x + mask_translate[0], start_y + mask_translate[1])])
+        #     start_points, end_points = random_start_and_end_points(start_end_regions_mask[:, :, 0], mask_translate, 1)
+        #     # start_points = [(start_x + mask_translate[0], start_y + mask_translate[1])]
+        #     print(f'[INFO] Planning is started: {start_points} -> {end_points}')
+        #     time_length_lists, nexts_list, speed_list, earliest_stop_pos_list = get_planning(
+        #         [start_points],
+                
+        #         [mask],
+                
+        #         [end_points],
+                
+        #         [len(start_points)],
+                
+        #         1
+        #     )
+        #     position_list = np.array(nexts_list).reshape(-1, 2)
+        #     position_list[..., 0] -= mask_translate[0]
+        #     position_list[..., 1] -= mask_translate[1]
+        #     print(f'[INFO] Planning is done.')
+        #     print(f'[INFO] Position: {position_list[0]} -> {position_list[-1]}')
 
-                            W_new = np.max(B_new[:, 0]) - np.min(B_new[:, 0])
-                            H_new = np.max(B_new[:, 1]) - np.min(B_new[:, 1])
+        # import matplotlib.pyplot as plt
+        # fig, ax = plt.subplots()
+        # plt.imshow(np.flipud(mask), origin='lower')   ######
+        # ax.scatter([np.array(start_points).reshape(2, )[0]], [np.array(start_points).reshape(2, )[1]], marker='o', color='red')
+        # ax.scatter([position_list[0, 0] + mask_translate[0]], [position_list[0, 1] + mask_translate[1]], marker='o')
+        # for t in range(len(position_list) // 10):
+        #     ax.scatter([position_list[min(t * 10, len(position_list) - 1), 0] + mask_translate[0]], [position_list[min(t * 10, len(position_list) - 1), 1] + mask_translate[1]], marker='.', c='green')
+        # ax.scatter([position_list[-1, 0] + mask_translate[0]], [position_list[-1, 1] + mask_translate[1]], marker='x')
+        # ax.scatter([np.array(end_points).reshape(2, )[0]], [np.array(end_points).reshape(2, )[1]], marker='*', color='red')
+        # plt.show()
+        # # plt.savefig('./tmp.png')
+        
+        # # initialize objects
+        # updated_cfg = copy.deepcopy(self.cfg)
+        # all_usd_files = os.listdir('assets/usds/')
+        # all_json_files = os.listdir('./assets/adj_parameter_folder/')
+        # usd_json_dict = {}
+        # for file in all_json_files:
+        #     json_state = json.load(open('./assets/adj_parameter_folder/' + file, 'rb'))
+        #     try:
+        #         usd_name = json_state['filename'].replace('.glb', '.usd').replace('-', '_').replace(" ", "")
+        #     except:
+        #         # {'TIRE_RADIUS': 0.6, 'TIRE_WIDTH': 0.25, 'MASS': 1100, 'LATERAL_TIRE_TO_CENTER': 1.1953352769679304, 
+        #         # 'FRONT_WHEELBASE': 2.7690288713910762, 'REAR_WHEELBASE': 2.087126137841352, 'CHASSIS_TO_WHEEL_AXIS': 0.0, 'TIRE_SCALE': 1.8, 'TIRE_OFFSET': -0.5801886792452831, 'MODEL_PATH': 'test/firerelated-aac70737c4f5478ebf9e14387a123214.glb', 'MODEL_SCALE': [1.1236023611051744, 1.1236023611051744, 1.1236023611051744], 'MODEL_OFFSET': [0, 0, -1.5], 'MODEL_HPR': [90.0, 0, 0], 'LENGTH': 7.570067405700684, 'HEIGHT': 3.144643008708954, 'WIDTH': 2.81737744808197, 'general': {'length': 7.570067405700684, 'width': 2.81737744808197, 'height': 3.144643008708954, 'bounding_box': [[3.907700300216675, 1.4086887836456299], [3.907700300216675, -1.4086886644363403], [-3.662367105484009, -1.4086886644363403], [-3.662367105484009, 1.4086887836456299]], 'center': [0.12266659736633301, 5.960464477539063e-08], 'color': 'Red', 'general_type': 'vehicle', 'detail_type': 'FireTruck'}}
+        #         usd_name = json_state['MODEL_PATH'].replace('.usd', '.usd').replace('-', '_').replace(" ", "").split('/')[-1]
+        #     usd_json_dict[usd_name] = json_state
+        # if engine.global_config['object_density'] > 0:
+        #     self.sync_obejct_dict = self.set_sync_objects()
+        #     import pickle
+        #     with open('./types.pkl', 'rb') as f:
+        #         types = pickle.load(f)
+        #     for idx, primpath_usd_pos_rot_scale in enumerate(self.sync_obejct_dict['obj_prim_path_list']):
+        #         try:
+        #             type_selected = [t for t in types if t in primpath_usd_pos_rot_scale[1]][0]
+        #         except:
+        #             type_selected = 'unknown'
+        #         np.random.seed(engine.global_config.get('instance_seed', 0))
+        #         if engine.global_config.get('random_re_instance', False):
+        #             if 'building' in primpath_usd_pos_rot_scale[1].lower():
+        #                 pass
+        #             else:
+        #                 try:
+        #                     files_to_be_selected = [f for f in all_usd_files if type_selected in f and 'non_metric' not in f and f != primpath_usd_pos_rot_scale[1]]
+        #                     selected_replace_file = np.random.choice(files_to_be_selected)
+        #                     json_state = usd_json_dict[selected_replace_file]
+        #                     json_raw_state = usd_json_dict[primpath_usd_pos_rot_scale[1]]
+        #                     B_orig = np.array(json_raw_state['general']['bounding_box'])
+        #                     B_new = np.array(json_state['general']['bounding_box'])
+        #                     W_orig = np.max(B_orig[:, 0]) - np.min(B_orig[:, 0])
+        #                     H_orig = np.max(B_orig[:, 1]) - np.min(B_orig[:, 1])
 
-                            s_x = W_orig / W_new
-                            s_y = H_orig / H_new
+        #                     W_new = np.max(B_new[:, 0]) - np.min(B_new[:, 0])
+        #                     H_new = np.max(B_new[:, 1]) - np.min(B_new[:, 1])
+
+        #                     s_x = W_orig / W_new
+        #                     s_y = H_orig / H_new
                             
-                            primpath_usd_pos_rot_scale[-1] = json_state['scale'] * s_x
-                            primpath_usd_pos_rot_scale[1] = selected_replace_file
-                            primpath_usd_pos_rot_scale[2] = [primpath_usd_pos_rot_scale[2][0] - json_raw_state['pos0'] + json_state['pos0'], primpath_usd_pos_rot_scale[2][1] - json_raw_state['pos1'] + json_state['pos1'], 2.11 + json_state['pos2']]
-                        except:
-                            pass
-                # if 'tree' in primpath_usd_pos_rot_scale[1].lower():
-                #     root_dir = f"{NVIDIA_NUCLEUS_DIR}/Assets/Vegetation/Trees/"
-                #     with open("tree_usd.txt", "r") as f:
-                #         valid_usd = [line.strip() for line in f.readlines() if line.strip()]
-                #     chosen_usd = np.random.choice(valid_usd)
-                #     rigid_cfg = RigidObjectCfg(
-                #         prim_path=primpath_usd_pos_rot_scale[0],
-                #         spawn=sim_utils.UsdFileCfg(
-                #             scale=(0.01, 0.01, 0.01),
-                #             usd_path=root_dir + chosen_usd,
-                #             # rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
-                #             # mass_props=sim_utils.MassPropertiesCfg(mass=1e10),
-                #             # collision_props=sim_utils.CollisionPropertiesCfg(),
-                #             semantic_tags=[("class", type_selected)],
-                #         ),
-                #         init_state=RigidObjectCfg.InitialStateCfg(rot=(0., 0., 0., 0.), pos=primpath_usd_pos_rot_scale[5]),
-                #     )
-                if 'tree' not in primpath_usd_pos_rot_scale[0].lower():
-                    rigid_cfg = RigidObjectCfg(
-                        prim_path=primpath_usd_pos_rot_scale[0],
-                        spawn=sim_utils.UsdFileCfg(
-                            scale=(primpath_usd_pos_rot_scale[4], primpath_usd_pos_rot_scale[4], primpath_usd_pos_rot_scale[4]),
-                            usd_path=f'assets/usds/{primpath_usd_pos_rot_scale[1]}',
-                            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
-                            mass_props=sim_utils.MassPropertiesCfg(mass=1e10),
-                            collision_props=sim_utils.CollisionPropertiesCfg(),
-                            semantic_tags=[("class", type_selected)],
-                        ),
-                        init_state=RigidObjectCfg.InitialStateCfg(rot=primpath_usd_pos_rot_scale[3], pos=primpath_usd_pos_rot_scale[2]),
-                    )
-                    setattr(updated_cfg, f'object_cfg_list_{idx:04d}', rigid_cfg)
+        #                     primpath_usd_pos_rot_scale[-1] = json_state['scale'] * s_x
+        #                     primpath_usd_pos_rot_scale[1] = selected_replace_file
+        #                     primpath_usd_pos_rot_scale[2] = [primpath_usd_pos_rot_scale[2][0] - json_raw_state['pos0'] + json_state['pos0'], primpath_usd_pos_rot_scale[2][1] - json_raw_state['pos1'] + json_state['pos1'], 2.11 + json_state['pos2']]
+        #                 except:
+        #                     pass
+        #         # if 'tree' in primpath_usd_pos_rot_scale[1].lower():
+        #         #     root_dir = f"{NVIDIA_NUCLEUS_DIR}/Assets/Vegetation/Trees/"
+        #         #     with open("tree_usd.txt", "r") as f:
+        #         #         valid_usd = [line.strip() for line in f.readlines() if line.strip()]
+        #         #     chosen_usd = np.random.choice(valid_usd)
+        #         #     rigid_cfg = RigidObjectCfg(
+        #         #         prim_path=primpath_usd_pos_rot_scale[0],
+        #         #         spawn=sim_utils.UsdFileCfg(
+        #         #             scale=(0.01, 0.01, 0.01),
+        #         #             usd_path=root_dir + chosen_usd,
+        #         #             # rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
+        #         #             # mass_props=sim_utils.MassPropertiesCfg(mass=1e10),
+        #         #             # collision_props=sim_utils.CollisionPropertiesCfg(),
+        #         #             semantic_tags=[("class", type_selected)],
+        #         #         ),
+        #         #         init_state=RigidObjectCfg.InitialStateCfg(rot=(0., 0., 0., 0.), pos=primpath_usd_pos_rot_scale[5]),
+        #         #     )
+        #         if 'tree' not in primpath_usd_pos_rot_scale[0].lower():
+        #             rigid_cfg = RigidObjectCfg(
+        #                 prim_path=primpath_usd_pos_rot_scale[0],
+        #                 spawn=sim_utils.UsdFileCfg(
+        #                     scale=(primpath_usd_pos_rot_scale[4], primpath_usd_pos_rot_scale[4], primpath_usd_pos_rot_scale[4]),
+        #                     usd_path=f'assets/usds/{primpath_usd_pos_rot_scale[1]}',
+        #                     rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
+        #                     mass_props=sim_utils.MassPropertiesCfg(mass=1e10),
+        #                     collision_props=sim_utils.CollisionPropertiesCfg(),
+        #                     semantic_tags=[("class", type_selected)],
+        #                 ),
+        #                 init_state=RigidObjectCfg.InitialStateCfg(rot=primpath_usd_pos_rot_scale[3], pos=primpath_usd_pos_rot_scale[2]),
+        #             )
+        #             setattr(updated_cfg, f'object_cfg_list_{idx:04d}', rigid_cfg)
         
-        self.cfg = updated_cfg
-        # generate and spawn scene
-        if self._is_scene_setup_from_cfg():
-            # add entities from config
-            self._add_entities_from_cfg(procedural_generation=True)
-            if engine.global_config['object_density'] > 0:
-                self.position_list = position_list
-                self.start_points = start_points
-                self.end_points = end_points
-                self.mask = mask
-                self.mask_translate = mask_translate
-            if engine.global_config.get('random_re_texturing', False):
-                for idx, primpath_usd_pos_rot_scale in enumerate(self.sync_obejct_dict['obj_prim_path_list']):
-                    np.random.seed(engine.global_config.get('instance_seed', 0))
-                    chosen_material = np.random.choice(
-                        [
-                           f'/World/Looks/Random_{i:02d}'for i in range(20)
-                        ]
-                    )
-                    sim_utils.bind_visual_material(primpath_usd_pos_rot_scale[0].replace('.*', '0'), chosen_material)
-            # sim_utils.bind_visual_material('/World/envs/env_0/trash_bin_6', '/World/Looks/SidewalkNMaterial')
-            sim_utils.bind_visual_material('/World/Lane', '/World/Looks/LaneMaterial')
-            sim_utils.bind_visual_material('/World/WhiteLine', '/World/Looks/LaneWhiteLineSurfaceMaterial')
-            sim_utils.bind_visual_material('/World/YellowLine', '/World/Looks/LaneYellowLineSurfaceMaterial')
-            sim_utils.bind_visual_material('/World/Sidewalk', '/World/Looks/SidewalkMaterial')
-            sim_utils.bind_visual_material('/World/NearRoad', '/World/Looks/SidewalkNMaterial')
-            sim_utils.bind_visual_material('/World/NearBuffer', '/World/Looks/SidewalkNBMaterial')
-            sim_utils.bind_visual_material('/World/FarFromBuffer', '/World/Looks/SidewalkFBMaterial')
-            sim_utils.bind_visual_material('/World/FarFromRoad', '/World/Looks/SidewalkFMaterial')
-            sim_utils.bind_visual_material('/World/HouseRegion', '/World/Looks/SidewalkHMaterial')
+        # self.cfg = updated_cfg
+        # # generate and spawn scene
+        # if self._is_scene_setup_from_cfg():
+        #     # add entities from config
+        #     self._add_entities_from_cfg(procedural_generation=True)
+        #     if engine.global_config['object_density'] > 0:
+        #         self.position_list = position_list
+        #         self.start_points = start_points
+        #         self.end_points = end_points
+        #         self.mask = mask
+        #         self.mask_translate = mask_translate
+        #     if engine.global_config.get('random_re_texturing', False):
+        #         for idx, primpath_usd_pos_rot_scale in enumerate(self.sync_obejct_dict['obj_prim_path_list']):
+        #             np.random.seed(engine.global_config.get('instance_seed', 0))
+        #             chosen_material = np.random.choice(
+        #                 [
+        #                    f'/World/Looks/Random_{i:02d}'for i in range(20)
+        #                 ]
+        #             )
+        #             sim_utils.bind_visual_material(primpath_usd_pos_rot_scale[0].replace('.*', '0'), chosen_material)
+            # # sim_utils.bind_visual_material('/World/envs/env_0/trash_bin_6', '/World/Looks/SidewalkNMaterial')
+            # sim_utils.bind_visual_material('/World/Lane', '/World/Looks/LaneMaterial')
+            # sim_utils.bind_visual_material('/World/WhiteLine', '/World/Looks/LaneWhiteLineSurfaceMaterial')
+            # sim_utils.bind_visual_material('/World/YellowLine', '/World/Looks/LaneYellowLineSurfaceMaterial')
+            # sim_utils.bind_visual_material('/World/Sidewalk', '/World/Looks/SidewalkMaterial')
+            # sim_utils.bind_visual_material('/World/NearRoad', '/World/Looks/SidewalkNMaterial')
+            # sim_utils.bind_visual_material('/World/NearBuffer', '/World/Looks/SidewalkNBMaterial')
+            # sim_utils.bind_visual_material('/World/FarFromBuffer', '/World/Looks/SidewalkFBMaterial')
+            # sim_utils.bind_visual_material('/World/FarFromRoad', '/World/Looks/SidewalkFMaterial')
+            # sim_utils.bind_visual_material('/World/HouseRegion', '/World/Looks/SidewalkHMaterial')
             
-            stage = omni.usd.get_context().get_stage()
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/ground/Environment'))
-            prim.SetActive(False)
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/Lane/Environment'))
-            prim.SetActive(False)
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/WhiteLine/Environment'))
-            prim.SetActive(False)
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/YellowLine/Environment'))
-            prim.SetActive(False)
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/Sidewalk/Environment'))
-            prim.SetActive(False)
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/NearRoad/Environment'))
-            prim.SetActive(False)
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/NearBuffer/Environment'))
-            prim.SetActive(False)
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/FarFromBuffer/Environment'))
-            prim.SetActive(False)
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/FarFromRoad/Environment'))
-            prim.SetActive(False)
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/HouseRegion/Environment'))
-            prim.SetActive(False)
+            # stage = omni.usd.get_context().get_stage()
+            # prim = stage.GetPrimAtPath(Sdf.Path(f'/World/ground/Environment'))
+            # prim.SetActive(False)
+            # prim = stage.GetPrimAtPath(Sdf.Path(f'/World/Lane/Environment'))
+            # prim.SetActive(False)
+            # prim = stage.GetPrimAtPath(Sdf.Path(f'/World/WhiteLine/Environment'))
+            # prim.SetActive(False)
+            # prim = stage.GetPrimAtPath(Sdf.Path(f'/World/YellowLine/Environment'))
+            # prim.SetActive(False)
+            # prim = stage.GetPrimAtPath(Sdf.Path(f'/World/Sidewalk/Environment'))
+            # prim.SetActive(False)
+            # prim = stage.GetPrimAtPath(Sdf.Path(f'/World/NearRoad/Environment'))
+            # prim.SetActive(False)
+            # prim = stage.GetPrimAtPath(Sdf.Path(f'/World/NearBuffer/Environment'))
+            # prim.SetActive(False)
+            # prim = stage.GetPrimAtPath(Sdf.Path(f'/World/FarFromBuffer/Environment'))
+            # prim.SetActive(False)
+            # prim = stage.GetPrimAtPath(Sdf.Path(f'/World/FarFromRoad/Environment'))
+            # prim.SetActive(False)
+            # prim = stage.GetPrimAtPath(Sdf.Path(f'/World/HouseRegion/Environment'))
+            # prim.SetActive(False)
          
-    def generate_3dgs_scene(self):
+    def generate_async_procedural_scene(self):
         pass
-    
-    def generate_urban_cousion_scene(self):
-        assert hasattr(self.cfg, 'layout_from_video_path'), 'Please set layout_from_video_path in config'
-        if not hasattr(self.cfg, 'use_random_cousin_instances'):
-            self.cfg.use_random_cousin_instances = False
-            print(f'[INFO] use_random_cousin_instances is set to False')
-        if self.cfg.use_random_cousin_instances:
-            if not hasattr(self.cfg, 'no_cousin_class_names'):
-                self.cfg.no_cousin_class_names = []
-                print(f'[INFO] no_cousin_class_names is set to []')
-            scene_folder = self.cfg.scene_folder
-            cname2cousin_info = {}
-            for cname_folder in os.listdir(f"{scene_folder}/urban_verse_assets_seq1"):
-                this_assets_info_list = []
-                for asset_folder in os.listdir(f"{scene_folder}/urban_verse_assets_seq1/{cname_folder}"):
-                    this_assets_info = {
-                        "glb_path": f"{scene_folder}/urban_verse_assets_seq1/{cname_folder}/{asset_folder}/adjusted_asset_scaled_bottomed.glb",
-                        "annotation_path": f"{scene_folder}/urban_verse_assets_seq1/{cname_folder}/{asset_folder}/annotations.json",
-                    }
-                    this_assets_info_list.append(this_assets_info)
-
-                cname_key = cname_folder.lower().replace("_", " ")
-                cname2cousin_info[cname_key] = this_assets_info_list
-            print('[INFO] cname2cousin_info is set to:')
-            print(cname2cousin_info.keys())
-            print('-----*****************************-----')
-
-            # Create an empty scene container
-            scene_layout = SceneEntity()
-            # Initialize the learned scene from disk
-            # You can then play with this SceneEntity class
-            scene_layout.load_from_serializable(self.cfg.layout_from_video_path)
-            num_instances = len(scene_layout.object_list)
-            for inst_id in range(num_instances):
-                cname = scene_layout.object_list[inst_id]['class_name']
-
-                if cname in self.cfg.no_cousin_class_names:
-                    scene_layout.object_list[inst_id]['bound_cousins'] = []
-                    continue
-
-                bound_cousins = cname2cousin_info.get(cname, None)
-                if bound_cousins is None:
-                    print(f"No cousin found for {cname}")
-                scene_layout.object_list[inst_id]['bound_cousins'] = bound_cousins
-            # Save and Reload
-            scene_layout.dump_to_serializable(f"{scene_folder}/scene_entity_bound_cousins.pkl.gz")
-            scene_layout_with_cousins = SceneEntity()
-
-            # Initialize the learned scene from disk
-            # You can then play with this SceneEntity class
-            scene_layout_with_cousins.load_from_serializable(f"{scene_folder}/scene_entity_bound_cousins.pkl.gz")
-            num_instances = len(scene_layout_with_cousins.object_list)
-            
-            # analyze the scene to get the global scale
-            height_list_of_the_video = []
-            height_list_of_the_instance = []
-            chosen_cousion = {}
-            for inst_id in range(num_instances): # instance in the scenario (bicycle1, bicycle2, bus1, bus2, etc.)
-                cousin_info = scene_layout_with_cousins.object_list[inst_id]['bound_cousins'] # each bicycle has a list of cousins
-                not_included_keys = []
-                for k, v in scene_layout_with_cousins.object_list[inst_id].items():
-                    if 'open3d' in str(type(v)):
-                        not_included_keys.append(k)
-                bbox_center_from_video = np.mean(scene_layout_with_cousins.object_list[inst_id]['aligned_bbox_np'], axis=0)
-                if len(cousin_info) > 0:
-                    cousion_instance = np.random.choice(cousin_info)
-                else:
-                    cousion_instance = None
-                if cousion_instance is not None:
-                    chosen_cousion[inst_id] = [cousion_instance, bbox_center_from_video]
-                    annotation_path = cousion_instance['annotation_path']
-                    if 'building' in annotation_path.lower():
-                        continue
-                    annotation = json.load(open(annotation_path, 'rb'))
-                    height_list_of_the_video.append(bbox_center_from_video[2])
-                    height_list_of_the_instance.append(annotation['height'])
-            assert len(height_list_of_the_video) > 0, 'No height information found in the video'
-            assert len(height_list_of_the_instance) == len(height_list_of_the_video), 'Height information mismatch between video and instance'
-            self.global_scale = np.mean(np.array(height_list_of_the_instance) / np.array(height_list_of_the_video)) # instance / height
-            print(f'[INFO] global_scale is set to {self.global_scale}')
-            updated_cfg = copy.deepcopy(self.cfg)
-            
-            # generate road
-            road_height = 0.3
-            road_mesh_list = []
-            for inst_id in range(num_instances): # instance in the scenario (bicycle1, bicycle2, bus1, bus2, etc.)
-                instance = scene_layout.object_list[inst_id]
-                cname = instance['class_name']
-                if cname in self.cfg.road_class_names:
-                    bbox_center_from_video = scene_layout_with_cousins.object_list[inst_id]['aligned_bbox_np'] * self.global_scale#[:, :2]
-                    bbox_center2d_from_video = bbox_center_from_video[::2, :2]
-                    lane_mesh = trimesh.creation.extrude_polygon(polygon=Polygon(bbox_center2d_from_video), height=road_height, engine="triangle")
-                    road_mesh_list += [lane_mesh]
-            if len(road_mesh_list) > 0:
-                combined_mesh = trimesh.util.concatenate(road_mesh_list)
-                uvs = []
-                for vertex in combined_mesh.vertices:
-                    uv = [vertex[0], vertex[1]]
-                    uvs.append(uv)
-                uvs = np.array(uvs)
-                uvs = (uvs - np.min(uvs)) / (np.max(uvs) - np.min(uvs))
-                uvs *= 20
-                combined_mesh.visual.uvs = uvs
-                
-                chosen_lane_mesh_idx = 1
-                self.all_region_list[chosen_lane_mesh_idx].import_mesh('mesh', combined_mesh)
-                sim_utils.bind_visual_material(f'/World/NonWalkable_{chosen_lane_mesh_idx:03d}', f'/World/Looks/terrain_non_walkable_material_list_{chosen_lane_mesh_idx:03d}')
-            # generate sidewalk
-            sidewalke_height = 0.32
-            sidewalke_mesh_list = []
-            for inst_id in range(num_instances): # instance in the scenario (bicycle1, bicycle2, bus1, bus2, etc.)
-                instance = scene_layout.object_list[inst_id]
-                cname = instance['class_name']
-                if cname in self.cfg.sidewalk_class_names:
-                    bbox_center_from_video = scene_layout_with_cousins.object_list[inst_id]['aligned_bbox_np'] * self.global_scale#[:, :2]
-                    bbox_center2d_from_video = bbox_center_from_video[::2, :2]
-                    lane_mesh = trimesh.creation.extrude_polygon(polygon=Polygon(bbox_center2d_from_video), height=sidewalke_height, engine="triangle")
-                    sidewalke_mesh_list += [lane_mesh]
-            if len(sidewalke_mesh_list) > 0:
-                combined_mesh = trimesh.util.concatenate(sidewalke_mesh_list)
-                uvs = []
-                for vertex in combined_mesh.vertices:
-                    uv = [vertex[0], vertex[1]]
-                    uvs.append(uv)
-                uvs = np.array(uvs)
-                uvs = (uvs - np.min(uvs)) / (np.max(uvs) - np.min(uvs))
-                uvs *= 20
-                combined_mesh.visual.uvs = uvs
-                
-                chosen_lane_mesh_idx = 1
-                self.walkable_terrain_list[chosen_lane_mesh_idx].import_mesh('mesh', combined_mesh)
-                sim_utils.bind_visual_material(f'/World/Walkable_{chosen_lane_mesh_idx:03d}', f'/World/Looks/terrain_non_walkable_material_list_{chosen_lane_mesh_idx:03d}')
-            stage = omni.usd.get_context().get_stage()
-            for i in range(max(len(self.all_region_list), len(self.walkable_terrain_list))):
-                try:
-                    prim = stage.GetPrimAtPath(Sdf.Path(f'/World/NonWalkable_{i:03d}/Environment'))
-                    prim.SetActive(False)
-                except:
-                    pass
-                
-                try:
-                    prim = stage.GetPrimAtPath(Sdf.Path(f'/World/Walkable_{i:03d}/Environment'))
-                    prim.SetActive(False)
-                except:
-                    pass
-            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/ground/Environment'))
-            prim.SetActive(False)
-            
-            for k, v in chosen_cousion.items():
-                
-                # HACK: Building should be alinged with edge rather than center
-                
-                
-                # raw info from parsing
-                cousin_info = v[0]
-                bbox_center_from_video = v[1]
-                cousin_info['pos'] = bbox_center_from_video * self.global_scale
-                cousin_info['pos'][-1] = road_height
-                cousin_info['rot'] = [0.707, 0.707, 0., 0.]
-                cousin_info['prim_path'] = f"/World/envs/env_.*/Object_{k}"
-                glb_path = cousin_info['glb_path']
-                asset_name = glb_path.split('/')[-2]
-                usd_path = 'adj_asset_usds/' + asset_name + '/scaled.usd'
-                
-                # HACK: compute additional rotation
-                
-                
-                
-                rigid_object_cfg  = RigidObjectCfg(
-                        prim_path=cousin_info['prim_path'],
-                        spawn=sim_utils.UsdFileCfg(
-                            scale=(1., 1., 1.),
-                            usd_path=usd_path,
-                            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
-                            mass_props=sim_utils.MassPropertiesCfg(mass=1e10),
-                            collision_props=sim_utils.CollisionPropertiesCfg(),
-                        ),
-                        init_state=RigidObjectCfg.InitialStateCfg(rot=cousin_info['rot'], pos=cousin_info['pos']),
-                    )
-                rigid_object_cfg.prim_path = rigid_object_cfg.prim_path.format(ENV_REGEX_NS=self.env_regex_ns)
-                if hasattr(rigid_object_cfg, "collision_group") and rigid_object_cfg.collision_group == -1:
-                    asset_paths = sim_utils.find_matching_prim_paths(rigid_object_cfg.prim_path)
-                    self._global_prim_paths += asset_paths
-                self._rigid_objects[f'{k}'] = rigid_object_cfg.class_type(rigid_object_cfg)
-        else:
-            raise NotImplementedError('Video layouts without cousions are not implemented yet')
     
     def setup_object_dict(self):
         if self._is_scene_setup_from_cfg():
@@ -2106,14 +1794,14 @@ class UrbanScene(InteractiveScene):
         all_assets = os.listdir(asset_root_path)
         all_assets = [i for i in all_assets if 'non_metric' not in i]
         import yaml
-        with open('metaurban_modified/asset_config.yaml', "r") as file:
+        with open('./assets//asset_config.yaml', "r") as file:
             asset_config = yaml.safe_load(file)
         asset_types = asset_config['type']
         asset_types_mapping = {}
         for k, v in asset_types.items():
             for sub_k in v.keys():
                 asset_types_mapping[sub_k] = k + '_' + sub_k
-        valid_assets = os.listdir('metaurban_modified/metaurban/assets/adj_parameter_folder/')
+        valid_assets = os.listdir('./assets/adj_parameter_folder/')
         self.asset_types_mapping = asset_types_mapping
     
     def setup_object_cache(self):
@@ -2128,14 +1816,14 @@ class UrbanScene(InteractiveScene):
         all_assets = os.listdir(asset_root_path)
         all_assets = [i for i in all_assets if 'non_metric' not in i]
         import yaml
-        with open('metaurban_modified/asset_config.yaml', "r") as file:
+        with open('./assets//asset_config.yaml', "r") as file:
             asset_config = yaml.safe_load(file)
         asset_types = asset_config['type']
         asset_types_mapping = {}
         for k, v in asset_types.items():
             for sub_k in v.keys():
                 asset_types_mapping[sub_k] = k + '_' + sub_k
-        valid_assets = os.listdir('metaurban_modified/metaurban/assets/adj_parameter_folder/')
+        valid_assets = os.listdir('./assets/adj_parameter_folder/')
         self.asset_types_mapping = asset_types_mapping
         # spawn all static objects in one dataset
         for asset_path in all_assets:
@@ -2151,7 +1839,7 @@ class UrbanScene(InteractiveScene):
                     break
             if not asset_valid:
                 continue
-            param_path = 'metaurban_modified/metaurban/assets/adj_parameter_folder/' + asset_path
+            param_path = './assets/adj_parameter_folder/' + asset_path
             obj_info = json.load(open(param_path, 'rb'))
             prim_path = asset_path[:-5].replace('-', '_')
             proto_prim_path = f"/World/Dataset/Object_{prim_path}"
@@ -2368,7 +2056,7 @@ class UrbanScene(InteractiveScene):
         obj_prim_path_list = []
         prim_path_list = []
             
-        valid_assets = os.listdir('metaurban_modified/metaurban/assets/adj_parameter_folder/')
+        valid_assets = os.listdir('./assets/adj_parameter_folder/')
         for obj_idx, (lane, lane_position, obj) in enumerate(engine.asset_manager.generated_objs):
             position = [lane_position[0], lane_position[1]] 
             usd_path = obj['filename'].replace('-', '_').replace(" ", "").split('.')[0] + '.usd'
@@ -2408,7 +2096,7 @@ class UrbanScene(InteractiveScene):
         obj_prim_path_list = []
         prim_path_list = []
             
-        valid_assets = os.listdir('metaurban_modified/metaurban/assets/adj_parameter_folder/')
+        valid_assets = os.listdir('./assets/adj_parameter_folder/')
         for obj_idx, (lane, lane_position, obj) in enumerate(engine.asset_manager.generated_objs):
             position = [lane_position[0], lane_position[1]] 
             usd_path = obj['filename'].replace('-', '_').replace(" ", "").split('.')[0] + '.usd'

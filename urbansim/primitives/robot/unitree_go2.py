@@ -73,9 +73,9 @@ def GO2RoughModifyEnv(env):
     # event
     env.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/base"
     # scale down the terrains because the robot is small
-    env.scene.terrain.terrain_generator.sub_terrains["boxes"].grid_height_range = (0.025, 0.1)
-    env.scene.terrain.terrain_generator.sub_terrains["random_rough"].noise_range = (0.01, 0.06)
-    env.scene.terrain.terrain_generator.sub_terrains["random_rough"].noise_step = 0.01
+    # env.scene.terrain.terrain_generator.sub_terrains["boxes"].grid_height_range = (0.025, 0.1)
+    # env.scene.terrain.terrain_generator.sub_terrains["random_rough"].noise_range = (0.01, 0.06)
+    # env.scene.terrain.terrain_generator.sub_terrains["random_rough"].noise_step = 0.01
 
     # reduce action scale
     env.actions.joint_pos.scale = 0.25
@@ -109,6 +109,20 @@ def GO2RoughModifyEnv(env):
 
     # terminations
     env.terminations.base_contact.params["sensor_cfg"].body_names = "base"
+    
+    # override rewards
+    env.rewards.flat_orientation_l2.weight = -2.5
+    env.rewards.feet_air_time.weight = 0.25
+
+    # change terrain to flat
+    env.scene.terrain.terrain_type = "plane"
+    env.scene.terrain.terrain_generator = None
+    # no height scan
+    env.scene.height_scanner = None
+    env.observations.policy.height_scan = None
+    # no terrain curriculum
+    env.curriculum.terrain_levels = None
+
 
 # ============================
 # Navigation

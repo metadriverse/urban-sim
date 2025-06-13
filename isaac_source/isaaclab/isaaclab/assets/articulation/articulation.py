@@ -163,11 +163,12 @@ class Articulation(AssetBase):
         if env_ids is None:
             env_ids = slice(None)
         # reset actuators
-        for actuator in self.actuators.values():
-            actuator.reset(env_ids)
-        # reset external wrench
-        self._external_force_b[env_ids] = 0.0
-        self._external_torque_b[env_ids] = 0.0
+        if hasattr(self, "actuators"):
+            for actuator in self.actuators.values():
+                actuator.reset(env_ids)
+            # reset external wrench
+            self._external_force_b[env_ids] = 0.0
+            self._external_torque_b[env_ids] = 0.0
 
     def write_data_to_sim(self):
         """Write external wrenches and joint commands to the simulation.

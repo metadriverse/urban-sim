@@ -1,0 +1,2 @@
+class FirstBlock:
+    ID = 'F'

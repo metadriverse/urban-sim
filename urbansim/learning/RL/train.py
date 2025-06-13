@@ -385,10 +385,15 @@ def train_with_rsl(env_cfg: ManagerBasedRLEnvCfg, agent_cfg: RslRlOnPolicyRunner
     # write git state to logs
     runner.add_git_repo_to_log(__file__)
     # load the checkpoint
-    if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
+    resume_path = 'logs/rsl_rl/go2_locomotion/2025-06-06_04-15-19/model_1499.pt'
+    if True:#agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
         print(f"[INFO]: Loading model checkpoint from: {resume_path}")
         # load previously trained model
         runner.load(resume_path)
+        trace_mdel = torch.jit.trace(runner.alg.policy.actor, torch.zeros([1, 48]).cuda())
+        trace_mdel.save(resume_path.replace('.pt', '_traced.pt'))
+        env.close()
+        return
 
     # dump the configuration into log-directory
     dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)

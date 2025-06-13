@@ -48,9 +48,9 @@ install_requires = [
     "seaborn",
     "tqdm",
     "progressbar",
-    # "panda3d==1.10.8",
-    #"panda3d==1.10.13",
-    #"panda3d-gltf==0.13",  # 0.14 will bring some problems
+    "mapbox_earcut",
+    "triangle",
+    "manifold3d",
     "pillow",
     "pytest",
     "opencv-python",
