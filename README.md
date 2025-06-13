@@ -6,7 +6,7 @@
 [![GitHub contributors](https://img.shields.io/github/contributors/metadriverse/urban-sim)](TODO)
 
 <p align="center">
-  <img src="docs/readme/URBANSIM.png" alt="Urban-Sim Teaser" width="100%">
+  <img src="docs/assets/output.gif" alt="Urban-Sim Teaser" width="100%">
 </p>
 
 <div style="text-align: center; width:100%; margin: 0 auto; display: inline-block">
