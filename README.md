@@ -76,6 +76,12 @@ It should be noted that you should install several dependencies including ```isa
 ## 🏃‍♂️ Simulation Environment
 
 We provide examples to demonstrate features and basic usages of URBAN-SIM after the local installation.
+### Synchronous Navigation Environment
+In synchronous navigation environments, spawned 
+
+### Asynchronous Navigation Environment
+
+In a point navigation environment, there will be only static objects besides the ego agent in the scenario.
 
 ## 🚀 Model Training
 
