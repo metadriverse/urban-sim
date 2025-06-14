@@ -39,6 +39,7 @@ To ensure the best experience with **URBAN-SIM**, please review the following ha
   - **Storage**: Minimum of **20GB free space**.  
 
 ### Installation
+#### 1. Install IsaacSim 4.5
 ```bash
 # Clone the repository
 git clone -b main --depth 1 https://github.com/metadriverse/urban-sim.git
@@ -58,11 +59,16 @@ export ISAACSIM_PATH="${HOME}/isaacsim"
 export ISAACSIM_PYTHON_EXE="${ISAACSIM_PATH}/python.sh"
 # note: you can pass the argument "--help" to see all arguments possible.
 ${ISAACSIM_PATH}/isaac-sim.sh
+```
 
+#### 2. Install URBAN-SIM
+
+```bash
 # Create a new conda environment and install required libraries
 bash urbansim.sh -c [env_name]  # The default name is "urbansim"
 conda activate urbansim         # Or use your specified env_name
 bash urbansim.sh -i             # Install dependencies and initialize
+bash urbansim.sh -a             # Advanced installation including procedural generation pipeline and rl training frameworks
 
 # Download the required assets
 python scripts/tools/collectors/collect_asset.py
@@ -83,7 +89,7 @@ In synchronous navigation environments, spawned
 
 In a point navigation environment, there will be only static objects besides the ego agent in the scenario.
 
-## 🚀 Model Training
+## 🚀 Reinforcement Learning
 
 ## 📖 Questions and Support
 
