@@ -51,7 +51,7 @@ class BaseEngine(EngineCore, Randomizable):
     def __init__(self, global_config):
         self.c_id = dict()
         self.id_c = dict()
-        self.try_pull_asset()
+        # self.try_pull_asset()
         EngineCore.__init__(self, global_config)
         Randomizable.__init__(self, self.global_random_seed)
         self.episode_step = 0

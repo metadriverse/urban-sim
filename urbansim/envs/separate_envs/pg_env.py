@@ -114,9 +114,9 @@ Define the Environment
 @configclass
 class ViewerCfg:
     """Configuration of the scene viewport camera."""
-    eye: tuple[float, float, float] = (-20, -20, 7.2)
+    eye: tuple[float, float, float] = (-150, -150, 25.2)
 
-    lookat: tuple[float, float, float] = (20, 20, -5)
+    lookat: tuple[float, float, float] = (100, 100, -5)
 
     cam_prim_path: str = "/OmniverseKit_Persp"
 
@@ -134,12 +134,12 @@ class BaseEnvCfg(ManagerBasedRLEnvCfg):
         print("Using async mode for the environment.")
         scene = SceneCfg(scenario_generation_method = "async procedural generation", 
                         #  pg_config=pg_config,
-                         num_envs=args_cli.num_envs, env_spacing=21.0)
+                         num_envs=args_cli.num_envs, env_spacing=181.0)
     else:
         print("Using sync mode for the environment.")
         scene = SceneCfg(scenario_generation_method = "sync procedural generation", 
                         #  pg_config=pg_config,
-                         num_envs=args_cli.num_envs, env_spacing=21.0)
+                         num_envs=args_cli.num_envs, env_spacing=181.0)
     
     viewer = ViewerCfg()
     

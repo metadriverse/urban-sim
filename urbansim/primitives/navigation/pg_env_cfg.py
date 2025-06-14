@@ -30,38 +30,24 @@ from urbansim.scene.urban_scene import UrbanSceneCfg
 # Random path
 material_path = './assets/materials'
 
-walkable_material_path_list = [
-    f'{material_path}/Ground/Small_Cobblestone.mdl',
-    f'{material_path}/Ground/Large_Granite_Paving.mdl',
-    f'{material_path}/Ground/Rough_Gravel.mdl',
-    f'{material_path}/Ground/Paving_Stones.mdl',
-    # f'{material_path}/Ground/Mulch.mdl',
-    
-]
-non_walkable_material_path_list = [    
-    f'{material_path}/Ground/Mulch.mdl',
-    f'{material_path}/Ground/Gravel_Track_Ballast.mdl',
-    f'{material_path}/Ground/Cobblestone_Big_and_Loose.mdl',
-    f'{material_path}/Ground/Asphalt_Fine.mdl',
-]
 terrain_gen_cfg = ROUGH_TERRAINS_CFG.replace(curriculum=False, color_scheme='none')
 
 light = np.random.choice(
     [
-        'Night/kloppenheim_02_4k.hdr',
-        'Night/moonlit_golf_4k.hdr',
-        'Cloudy/abandoned_parking_4k.hdr',
+        # 'Night/kloppenheim_02_4k.hdr',
+        # 'Night/moonlit_golf_4k.hdr',
+        # 'Cloudy/abandoned_parking_4k.hdr',
         'Cloudy/champagne_castle_1_4k.hdr',
-        'Cloudy/evening_road_01_4k.hdr',
-        'Cloudy/kloofendal_48d_partly_cloudy_4k.hdr',
-        'Cloudy/lakeside_4k.hdr',
-        'Cloudy/sunflowers_4k.hdr',
-        'Cloudy/table_mountain_1_4k.hdr',
-        'Evening/evening_road_01_4k.hdr',
-        'Storm/approaching_storm_4k.hdr',
+        # 'Cloudy/evening_road_01_4k.hdr',
+        # 'Cloudy/kloofendal_48d_partly_cloudy_4k.hdr',
+        # 'Cloudy/lakeside_4k.hdr',
+        # 'Cloudy/sunflowers_4k.hdr',
+        # 'Cloudy/table_mountain_1_4k.hdr',
+        # 'Evening/evening_road_01_4k.hdr',
+        # 'Storm/approaching_storm_4k.hdr',
     ]
 )
-light_intensity = np.random.uniform(700.0, 800.0)
+light_intensity = np.random.uniform(1000.0, 1050.0)
 
 #------------------------------------------------
 # Scene Config
@@ -75,11 +61,9 @@ class SceneCfg(UrbanSceneCfg):
     # procedural generation config
     pg_config: dict = dict(
         type='clean', # [clean, static, dynamic]
-        map_config='XCX', # [X for intersection, S for straight road, C for curved road] [user can use any combination of these letters to generate a map, such as XSX]
-        lane_num = 2,
-        lane_width = 3.5,
-        exit_length = 50.,
-        sidewalk_type='Medium Commercial',
+        map='X', # [X for intersection, S for straight road, C for curved road] [user can use any combination of these letters to generate a map, such as XSX]
+        crswalk_density=1.,
+        # sidewalk_type: randomly choose from the list below
         # ['Narrow Sidewalk', 'Narrow Sidewalk with Trees', 'Ribbon Sidewalk', 'Neighborhood 1', 'Neighborhood 2',
         #     'Medium Commercial', 'Wide Commercial'
         # ]
@@ -113,6 +97,100 @@ class SceneCfg(UrbanSceneCfg):
     )
     
     terrain_gen_cfg = ROUGH_TERRAINS_CFG.replace(curriculum=False, color_scheme='none')
+    procedural_generation_lane_terrain_importer_cfg = TerrainImporterCfg(
+        prim_path="/World/Lane",
+        max_init_terrain_level=None,
+        terrain_type="plane",
+        terrain_generator=terrain_gen_cfg,
+        debug_vis=False,
+        visual_material=None,
+        #visual_material=visual_material_cfg
+    )
+    procedural_generation_whiteline_terrain_importer_cfg = TerrainImporterCfg(
+        prim_path="/World/WhiteLine",
+        max_init_terrain_level=None,
+        terrain_type="plane",
+        terrain_generator=terrain_gen_cfg,
+        debug_vis=False,
+        #visual_material=visual_material_cfg
+    )
+    procedural_generation_yellowline_terrain_importer_cfg = TerrainImporterCfg(
+        prim_path="/World/YellowLine",
+        max_init_terrain_level=None,
+        terrain_type="plane",
+        terrain_generator=terrain_gen_cfg,
+        debug_vis=False,
+        #visual_material=visual_material_cfg
+    )
+    lane_whiteline_visual_material_cfg = sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 1.0, 1.0))
+    lane_whiteline_visual_material_cfg.func('/World/Looks/LaneWhiteLineSurfaceMaterial', lane_whiteline_visual_material_cfg)
+    lane_yellowline_visual_material_cfg = sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.7843137254901961, 0.0))
+    lane_yellowline_visual_material_cfg.func('/World/Looks/LaneYellowLineSurfaceMaterial', lane_yellowline_visual_material_cfg)
+    
+    # # sidewalk related terrain importer
+    procedural_generation_near_road_importer_cfg = TerrainImporterCfg(
+        prim_path="/World/NearRoad",
+        max_init_terrain_level=None,
+        terrain_type="plane",
+        terrain_generator=terrain_gen_cfg,
+        debug_vis=False,
+        visual_material=None
+    )
+    procedural_generation_near_buffer_importer_cfg = TerrainImporterCfg(
+        prim_path="/World/NearBuffer",
+        max_init_terrain_level=None,
+        terrain_type="plane",
+        terrain_generator=terrain_gen_cfg,
+        debug_vis=False,
+        visual_material=None
+    )
+    procedural_generation_sidewalk_importer_cfg = TerrainImporterCfg(
+        prim_path="/World/Sidewalk",
+        max_init_terrain_level=None,
+        terrain_type="plane",
+        terrain_generator=terrain_gen_cfg,
+        debug_vis=False,
+        visual_material=None
+    )
+    procedural_generation_farfrom_buffer_importer_cfg = TerrainImporterCfg(
+        prim_path="/World/FarFromBuffer",
+        max_init_terrain_level=None,
+        terrain_type="plane",
+        terrain_generator=terrain_gen_cfg,
+        debug_vis=False,
+        visual_material=None
+    )
+    procedural_generation_farfrom_road_importer_cfg = TerrainImporterCfg(
+        prim_path="/World/FarFromRoad",
+        max_init_terrain_level=None,
+        terrain_type="plane",
+        terrain_generator=terrain_gen_cfg,
+        debug_vis=False,
+        visual_material=None
+    )
+    procedural_generation_house_region_importer_cfg = TerrainImporterCfg(
+        prim_path="/World/HouseRegion",
+        max_init_terrain_level=None,
+        terrain_type="plane",
+        terrain_generator=terrain_gen_cfg,
+        debug_vis=False,
+        visual_material=None
+    )
+    
+    lane_material_cfg = sim_utils.MdlFileCfg(mdl_path=f'{material_path}/Concrete/Mortar.mdl', project_uvw=True, texture_scale=1000)
+    lane_material_cfg.func('/World/Looks/LaneMaterial', lane_material_cfg)
+    sidewalk_material_cfg = sim_utils.MdlFileCfg(mdl_path=f'{material_path}/Ground/Paving_Stones.mdl', project_uvw=True, texture_scale=1000)
+    sidewalk_material_cfg.func('/World/Looks/SidewalkMaterial', sidewalk_material_cfg)
+    sidewalk_n_material_cfg = sim_utils.MdlFileCfg(mdl_path=f'{material_path}/Ground/Cobblestone_Big_and_Loose.mdl', project_uvw=True, texture_scale=1000)
+    sidewalk_n_material_cfg.func('/World/Looks/SidewalkNMaterial', sidewalk_n_material_cfg)
+    sidewalk_nb_material_cfg = sim_utils.MdlFileCfg(mdl_path=f'{material_path}/Ground/Cobblestone_Medieval.mdl', project_uvw=True, texture_scale=1000)
+    sidewalk_nb_material_cfg.func('/World/Looks/SidewalkNBMaterial', sidewalk_nb_material_cfg)
+    sidewalk_f_material_cfg = sim_utils.MdlFileCfg(mdl_path=f'{material_path}/Ground/Rough_Gravel.mdl', project_uvw=True, texture_scale=1000)
+    sidewalk_f_material_cfg.func('/World/Looks/SidewalkFMaterial', sidewalk_f_material_cfg)
+    sidewalk_fb_material_cfg = sim_utils.MdlFileCfg(mdl_path=f'{material_path}/Ground/Mulch.mdl', project_uvw=True, texture_scale=1000)
+    sidewalk_fb_material_cfg.func('/World/Looks/SidewalkFBMaterial', sidewalk_fb_material_cfg)
+    sidewalk_h_material_cfg = sim_utils.MdlFileCfg(mdl_path=f'{material_path}/Concrete/Concrete_Formed.mdl', project_uvw=True, texture_scale=1000)
+    sidewalk_h_material_cfg.func('/World/Looks/SidewalkHMaterial', sidewalk_h_material_cfg)
     
     # sensor
     contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True)
