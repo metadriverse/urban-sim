@@ -1,0 +1,24 @@
+Task: Navigation
+Env:
+  name: static
+Robot:
+  type: coco # [unitree_go2, coco, unitree_b2w, unitree_g2]
+  controller: default # [default] or specific module
+  sensor: default
+  tiled_sensor: True
+  init_position: [1., 1., 0.4]
+Omniverse:
+  headless: True
+  simulation_dt: 0.005
+  rendering_interval: 4
+  decimation: 40
+  episode_length_s: 20.0
+  env_spacing: 30.0
+  scenario_generation_method: limited async procedural generation
+Training:
+  framework: rl_games # [rl_games, rsl]
+  training_config_entry: default # [default] or specific entry
+  use_gpu: True
+  num_envs: 4
+  num_gpu: 1
+  use_ddp: False

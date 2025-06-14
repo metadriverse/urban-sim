@@ -29,6 +29,7 @@ parser = argparse.ArgumentParser("Welcome to URBAN-SIM Environments!")
 parser.add_argument("--env", type=str, default=None, help="Configuration file for the environment.")
 parser.add_argument("--framework", type=str, default='rlgames', choices=['rlgames', 'rsl'], help="Learning framework. Recommended to use [rsl] for locomotion and [rlgames] for navigation.")
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to spawn.")
+parser.add_argument("--trace_model", action="store_true", default=False, help="Trace the model and save it as a TorchScript model.")
 parser.add_argument(
     "--color_scheme",
     type=str,
@@ -129,11 +130,11 @@ task_name = env_config['Task'].lower()
 assert task_name in ['navigation', 'locomotion'], '[Task] Only support [navigation, locomotion] currently'
 setting_name = env_config['Env']['name']
 if task_name == 'navigation':
-    assert setting_name in ['emppty', 'terrain', 'static', 'dynamic'], '[Env] Only support [emppty, terrain, static, dynamic] currently in navigation currently'
+    assert setting_name in ['clean', 'static', 'dynamic'], '[Env] Only support [clean, static, dynamic] currently in navigation currently'
 elif task_name == 'locomotion':
-    assert setting_name in ['flat', 'slope', 'stair', 'rough', 'general'], '[Env] Only support [flat, slope, stair, rough, general] in locomotion currently'
+    assert setting_name in ['general'], '[Env] Only support [general] in locomotion currently'
 robot_name = env_config['Robot']['type']
-assert robot_name in ['unitree_go2', 'coco', 'anymal_c', 'unitree_b2w', 'unitree_g1'], '[Robot] Only support [unitree_go2, coco, anymal_c, unitree_b2w, unitree_g1] currently'
+assert robot_name in ['unitree_go2', 'coco', 'anymal_c', 'unitree_g1'], '[Robot] Only support [unitree_go2, coco, anymal_c, unitree_g1] currently'
 
 print('[INFO] Task: {}'.format(task_name))
 print('[INFO] Setting: {}'.format(setting_name))
@@ -172,7 +173,41 @@ if setting_name == 'general':
     
     from urbansim.primitives.locomotion.general import SceneCfg
     scene_cfg = SceneCfg
+    pg_config = None
     
+else:
+    from urbansim.primitives.navigation.random_env_cfg import ObservationsCfg
+    from urbansim.primitives.navigation.random_env_cfg import CommandsCfg
+    from urbansim.primitives.navigation.random_env_cfg import RewardsCfg
+    from urbansim.primitives.navigation.random_env_cfg import TerminationsCfg
+    from urbansim.primitives.navigation.random_env_cfg import EventCfg
+    from urbansim.primitives.navigation.random_env_cfg import CurriculumCfg
+    
+    observation_cfg = ObservationsCfg
+    command_cfg = CommandsCfg
+    reward_cfg = RewardsCfg
+    termination_cfg = TerminationsCfg
+    event_cfg = EventCfg
+    curriculum_cfg = CurriculumCfg
+    
+    from urbansim.primitives.navigation.random_env_cfg import SceneCfg
+    scene_cfg = SceneCfg
+    pg_config = dict(
+        type=setting_name, # [clean, static, dynamic]
+        with_terrain=False,
+        with_boundary=True,
+        map_region=20,
+        buffer_width=1,
+        num_object=13,
+        num_pedestrian=4,
+        walkable_seed=0,
+        non_walkable_seed=1,
+        seed=423,
+        unique_env_num=20,
+        ped_forward_inteval=10,
+        moving_max_t=80,
+    )
+        
 if task_name.lower() == 'locomotion':
     assert not robot_name.lower() == 'coco', '[Robot] Coco is not supported in locomotion currently'
     if robot_name.lower() == 'unitree_go2':
@@ -214,14 +249,26 @@ if task_name.lower() == 'locomotion':
             robot_cfg = G1_MINIMAL_CFG
             action_cfg = G1LocActionsCfg
             modify_env_fn = G1FlatModifyEnv
-            
+else:
+    if robot_name.lower() == 'coco':
+        from urbansim.primitives.robot.coco import COCO_CFG
+        from urbansim.primitives.robot.coco import COCOVelocityActionsCfg
+
+        from urbansim.primitives.robot.coco import COCONavModifyEnv
+        robot_cfg = COCO_CFG
+        action_cfg = COCOVelocityActionsCfg
+        modify_env_fn = COCONavModifyEnv
+        
 # generate env cfg
 @configclass
 class EnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
 
     # Scene settings
-    scene = scene_cfg(num_envs=env_config['Training']['num_envs'], env_spacing=env_config['Omniverse']['env_spacing'])
+    scene = scene_cfg(num_envs=env_config['Training']['num_envs'], 
+                      env_spacing=env_config['Omniverse']['env_spacing'],
+                      pg_config=pg_config,
+                      scenario_generation_method=env_config['Omniverse'].get('scenario_generation_method', None),)
     # Basic settings
     observations = observation_cfg()
     actions = action_cfg()
@@ -270,8 +317,8 @@ class EnvCfg(ManagerBasedRLEnvCfg):
 # register env
 import gymnasium as gym
 gym.register(
-    id=f"IsaacUrban-{task_name}-{robot_name}-{setting_name}",
-    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    id=f"URBANSIM-{task_name}-{robot_name}-{setting_name}",
+    entry_point="urbansim.envs:AbstractRLEnv",
     disable_env_checker=True,
     kwargs={
         "env_cfg_entry_point": EnvCfg,
@@ -279,7 +326,7 @@ gym.register(
         "rl_games_cfg_entry_point": f"configs/rl_configs/{task_name}/{robot_name}/{setting_name}_train.yaml",
     },
 )
-args_cli.task = f"IsaacUrban-{task_name}-{robot_name}-{setting_name}"
+args_cli.task = f"URBANSIM-{task_name}-{robot_name}-{setting_name}"
 
 # RL framework
 rl_framework = env_config['Training']['framework']
@@ -385,15 +432,14 @@ def train_with_rsl(env_cfg: ManagerBasedRLEnvCfg, agent_cfg: RslRlOnPolicyRunner
     # write git state to logs
     runner.add_git_repo_to_log(__file__)
     # load the checkpoint
-    resume_path = 'logs/rsl_rl/go2_locomotion/2025-06-06_04-15-19/model_1499.pt'
-    if True:#agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
+    if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
         print(f"[INFO]: Loading model checkpoint from: {resume_path}")
         # load previously trained model
         runner.load(resume_path)
-        trace_mdel = torch.jit.trace(runner.alg.policy.actor, torch.zeros([1, 48]).cuda())
-        trace_mdel.save(resume_path.replace('.pt', '_traced.pt'))
-        env.close()
-        return
+        if args_cli.trace_model:
+            print(f"[INFO]: Tracing model and saving to: {resume_path.replace('.pt', '_traced.pt')}")
+            trace_mdel = torch.jit.trace(runner.alg.policy.actor, torch.from_numpy(env.unwrapped.action_space.sample()).cuda()[0:1].reshape(1, -1))
+            trace_mdel.save(resume_path.replace('.pt', '_traced.pt'))
 
     # dump the configuration into log-directory
     dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
@@ -407,7 +453,64 @@ def train_with_rsl(env_cfg: ManagerBasedRLEnvCfg, agent_cfg: RslRlOnPolicyRunner
     # close the simulator
     env.close()
 
+def train_with_rlgames():
+    env_cfg = parse_env_cfg()
+    agent_cfg = load_cfg_from_registry(args_cli.task, "rl_games_cfg_entry_point")
+    if args_cli.seed is not None:
+        agent_cfg["params"]["seed"] = args_cli.seed
+        print('[INFO] Overwrite seed to:', args_cli.seed)
+    if args_cli.distributed:
+        agent_cfg["params"]["seed"] += app_launcher.global_rank
+        agent_cfg["params"]["config"]["device"] = f"cuda:{app_launcher.local_rank}"
+        agent_cfg["params"]["config"]["device_name"] = f"cuda:{app_launcher.local_rank}"
+        agent_cfg["params"]["config"]["multi_gpu"] = True
+        # update env config device
+        env_cfg.sim.device = f"cuda:{app_launcher.local_rank}"
+        
+    # max iterations
+    if args_cli.max_iterations:
+        agent_cfg["params"]["config"]["max_epochs"] = args_cli.max_iterations
+        
+    # read configurations about the agent-training
+    rl_device = agent_cfg["params"]["config"]["device"]
+    clip_obs = agent_cfg["params"]["env"].get("clip_observations", math.inf)
+    clip_actions = agent_cfg["params"]["env"].get("clip_actions", math.inf)
+
+    # create isaac environment
+    env = gym.make(args_cli.task, cfg=env_cfg, render_mode='rgb_array')
+    video_kwargs = {
+        "video_folder": f"logged_videos/{args_cli.task}",
+        "step_trigger": lambda step: step % 1000 == 0,
+        "video_length": 320,
+    }
+    env = gym.wrappers.RecordVideo(env, **video_kwargs)
+    
+    env = RlGamesVecEnvWrapper(env, rl_device, clip_obs, clip_actions)
+    vecenv.register(
+            "IsaacRlgWrapper", lambda config_name, num_actors, **kwargs: RlGamesGpuEnv(config_name, num_actors, **kwargs)
+        )
+    env_configurations.register("rlgpu", {"vecenv_type": "IsaacRlgWrapper", "env_creator": lambda **kwargs: env})
+    
+    obs = env.reset()
+    
+    # set number of actors into agent config
+    agent_cfg["params"]["config"]["num_actors"] = env.unwrapped.num_envs
+    # create runner from rl-games
+    runner = Runner(IsaacAlgoObserver())
+    runner.load(agent_cfg)
+    
+    env.seed(agent_cfg["params"]["seed"])
+    # reset the agent and env
+    runner.reset()
+    # train the agent
+    runner.run({"train": True, "play": False, "sigma": None, "checkpoint": ''})
+
+    # close the simulator
+    env.close()
 
 if __name__ == '__main__':
-    train_with_rsl()
+    if env_config['Training']['framework'] == 'rsl':
+        train_with_rsl()
+    elif env_config['Training']['framework'] == 'rl_games':
+        train_with_rlgames()
     simulation_app.close()

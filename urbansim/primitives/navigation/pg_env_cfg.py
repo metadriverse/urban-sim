@@ -60,7 +60,7 @@ class SceneCfg(UrbanSceneCfg):
     
     # procedural generation config
     pg_config: dict = dict(
-        type='clean', # [clean, static, dynamic]
+        type='static', # [static]
         map='X', # [X for intersection, S for straight road, C for curved road] [user can use any combination of these letters to generate a map, such as XSX]
         crswalk_density=1.,
         # sidewalk_type: randomly choose from the list below
@@ -68,8 +68,9 @@ class SceneCfg(UrbanSceneCfg):
         #     'Medium Commercial', 'Wide Commercial'
         # ]
         object_density=0.7,
-        seed=0,
+        seed=113,
         use_orca_for_agent_trajectory_generation=False,
+        num_scenarios=200,
     )
     
     # robot

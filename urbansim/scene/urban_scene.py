@@ -1620,14 +1620,18 @@ class UrbanScene(InteractiveScene):
         self.logical_engine.register_manager('map_manager', PGMapManager())
         if self.cfg.pg_config['type'] != 'clean':
             self.logical_engine.register_manager('asset_manager', AssetManager())
-        if self.cfg.pg_config['type'] == 'dynamic':
-            self.logical_engine.register_manager('human_manager', PGBackgroundSidewalkAssetsManager())
+        # if self.cfg.pg_config['type'] == 'dynamic':
+        #     self.logical_engine.register_manager('human_manager', PGBackgroundSidewalkAssetsManager())
         print(f'[INFO] Logical engine is created.')
         
         # reset engine
         engine = self.logical_engine
         set_global_random_seed((engine.global_config['seed'] + engine.gets_start_index(engine.global_config)) % engine.global_config['num_scenarios'])
-        engine.reset()
+        try:
+            engine.reset()
+        except:
+            set_global_random_seed(engine.gets_start_index(engine.global_config) % engine.global_config['num_scenarios'])
+            engine.reset()
         print(f'[INFO] Logical engine is reset.')
         
         self.setup_object_dict()
@@ -1723,7 +1727,161 @@ class UrbanScene(InteractiveScene):
             prim.SetActive(False)
          
     def generate_async_procedural_scene(self):
-        pass
+        from metaurban.manager.traffic_manager import TrafficMode
+        from metaurban.manager.sidewalk_manager import AssetManager
+        from metaurban.manager.humanoid_manager import PGBackgroundSidewalkAssetsManager
+
+        from metaurban.utils import clip, Config
+        from metaurban.engine.engine_utils import set_global_random_seed
+        from metaurban.component.map.pg_map import parse_map_config, MapGenerateMethod
+
+        
+        from metaurban.engine.base_engine import BaseEngine
+        from urbansim.utils import BASE_DEFAULT_CONFIG
+        from urbansim.utils.map_manager import PGMapManager
+        
+        # configure the logical engine
+        config = Config(BASE_DEFAULT_CONFIG)
+        config.register_type("map", str, int)
+        config["map_config"].register_type("config", None)
+        config.update(dict(
+            use_render=False, image_observation=False, interface_panel=False,
+            
+            # traffic related
+            show_mid_block_map=False,
+            traffic_mode=TrafficMode.Trigger,
+            random_traffic=False,
+            traffic_density=0.0,
+            traffic_vehicle_config=dict(
+            show_navi_mark=False,
+            show_dest_mark=False,
+            enable_reverse=False,
+            show_lidar=False,
+            show_lane_line_detector=False,
+            show_side_detector=False,),
+            
+             # pedestrian related
+            spawn_human_num=1,
+            spawn_wheelchairman_num=0,
+            spawn_edog_num = 0,
+            spawn_erobot_num=0,
+            spawn_drobot_num=0,
+            max_actor_num=1,))
+        
+        default_config_copy = Config(config, unchangeable=True)
+        
+        merged_config = config.update(self.cfg.pg_config, True, ["agent_configs", "sensors"])
+        merged_config["map_config"] = parse_map_config(
+            easy_map_config=config["map"], new_map_config=config["map_config"], default_config=default_config_copy
+        )
+        
+        PG_CONFIG = Config(merged_config, unchangeable=False)
+        
+        cls = BaseEngine
+        cls.singleton = BaseEngine(PG_CONFIG)
+        self.logical_engine = cls.singleton
+        self.logical_engine.register_manager('map_manager', PGMapManager())
+        if self.cfg.pg_config['type'] != 'clean':
+            self.logical_engine.register_manager('asset_manager', AssetManager())
+        # if self.cfg.pg_config['type'] == 'dynamic':
+        #     self.logical_engine.register_manager('human_manager', PGBackgroundSidewalkAssetsManager())
+        print(f'[INFO] Logical engine is created.')
+        # reset engine
+        engine = self.logical_engine
+        set_global_random_seed((engine.global_config['seed'] + engine.gets_start_index(engine.global_config)) % engine.global_config['num_scenarios'])
+        try:
+            engine.reset()
+        except:
+            engine.seed(((0) % PG_CONFIG['num_scenarios']) + engine.global_config['start_seed'])
+            engine.reset()
+        print(f'[INFO] Logical engine is reset.')
+        
+        # setup object cache
+        self.setup_object_cache()
+        print(f'[INFO] Object cache is setup.')
+        
+        self.polygons_of_lane = []
+        self.white_line_polygons = []
+        self.yellow_line_polygons = []
+        self.nb_polygons = []
+        self.n_polygons = []
+        self.s_polygons = []
+        self.fb_polygons = []
+        self.f_polygons = []
+        self.h_polygons = []
+        self.obj_prim = []
+        for idx in range(self.num_envs):
+            self.set_sidewalk(engine.global_config['sidewalk_type'])
+            # initialize polygon
+            polyline_polygon_dict = self.set_polyline_polygon()
+            self.polygons_of_lane += [polyline_polygon_dict['polygons']]
+            self.white_line_polygons += [polyline_polygon_dict['white_line_polygons']]
+            self.yellow_line_polygons += [polyline_polygon_dict['lane_yellow_line_polygons']]
+            self.nb_polygons += [polyline_polygon_dict['near_road_buffer_polygons']]
+            self.n_polygons += [polyline_polygon_dict['near_road_sidewalk_polygons']]
+            self.s_polygons += [polyline_polygon_dict['sidewalk_polygons']]
+            self.fb_polygons += [polyline_polygon_dict['far_road_buffer_polygons']]
+            self.f_polygons += [polyline_polygon_dict['far_road_sidewalk_polygons']]
+            self.h_polygons += [polyline_polygon_dict['house_region_polygons']]
+            
+            # generate objects
+            obj_info_dict = self.set_async_objects(idx)
+            obj_prim = obj_info_dict['obj_prim_path_list']
+            self.obj_prim += obj_prim
+            
+            engine.seed(((engine.current_seed + 1) % PG_CONFIG['num_scenarios']) + engine.global_config['start_seed'])
+            try:
+                engine.reset()
+            except Exception as e:
+                engine.seed(((0) % PG_CONFIG['num_scenarios']) + engine.global_config['start_seed'])
+                engine.reset()
+        all_rigid_objects_config = RigidObjectCfg(
+            prim_path="/World/envs/env_*/Object_*",
+            spawn=DiverseAssetCfg(
+                assets_cfg=self.obj_prim
+            )
+        )
+
+        updated_cfg = copy.deepcopy(self.cfg)
+        updated_cfg.object_cfg_list = all_rigid_objects_config
+        self.cfg = updated_cfg
+        
+        # generate and spawn scene
+        if self._is_scene_setup_from_cfg():
+            # add entities from config
+            self._add_entities_from_cfg(procedural_generation=True)
+            
+            sim_utils.bind_visual_material('/World/Lane', '/World/Looks/LaneMaterial')
+            sim_utils.bind_visual_material('/World/WhiteLine', '/World/Looks/LaneWhiteLineSurfaceMaterial')
+            sim_utils.bind_visual_material('/World/YellowLine', '/World/Looks/LaneYellowLineSurfaceMaterial')
+            sim_utils.bind_visual_material('/World/Sidewalk', '/World/Looks/SidewalkMaterial')
+            sim_utils.bind_visual_material('/World/NearRoad', '/World/Looks/SidewalkNMaterial')
+            sim_utils.bind_visual_material('/World/NearBuffer', '/World/Looks/SidewalkNBMaterial')
+            sim_utils.bind_visual_material('/World/FarFromBuffer', '/World/Looks/SidewalkFBMaterial')
+            sim_utils.bind_visual_material('/World/FarFromRoad', '/World/Looks/SidewalkFMaterial')
+            sim_utils.bind_visual_material('/World/HouseRegion', '/World/Looks/SidewalkHMaterial')
+            
+            stage = omni.usd.get_context().get_stage()
+            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/ground/Environment'))
+            prim.SetActive(False)
+            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/Lane/Environment'))
+            prim.SetActive(False)
+            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/WhiteLine/Environment'))
+            prim.SetActive(False)
+            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/YellowLine/Environment'))
+            prim.SetActive(False)
+            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/Sidewalk/Environment'))
+            prim.SetActive(False)
+            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/NearRoad/Environment'))
+            prim.SetActive(False)
+            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/NearBuffer/Environment'))
+            prim.SetActive(False)
+            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/FarFromBuffer/Environment'))
+            prim.SetActive(False)
+            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/FarFromRoad/Environment'))
+            prim.SetActive(False)
+            prim = stage.GetPrimAtPath(Sdf.Path(f'/World/HouseRegion/Environment'))
+            prim.SetActive(False)
     
     def setup_object_dict(self):
         if self._is_scene_setup_from_cfg():

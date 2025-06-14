@@ -157,8 +157,8 @@ class SceneCfg(UrbanSceneCfg):
     camera = TiledCameraCfg(
         prim_path="{ENV_REGEX_NS}/Robot/base/front_cam",
         update_period=0.1,
-        height=480,
-        width=640,
+        height=128,
+        width=128,
         data_types=['rgb', 'distance_to_image_plane'],
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=12.0, focus_distance=400.0, horizontal_aperture=30.0, clipping_range=(0.1, 1.0e5)

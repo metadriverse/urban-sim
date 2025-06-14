@@ -26,9 +26,7 @@ from isaaclab.app import AppLauncher
 parser = argparse.ArgumentParser("Welcome to URBAN-SIM Environments!")
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to spawn.")
 parser.add_argument("--use_async", action="store_true", default=False, help="Run simulation in async mode.")
-parser.add_argument("--use_terrain", action="store_true", default=False, help="Generate terrain in the environment.")
 parser.add_argument("--save_images", action="store_true", default=False, help="Whether to save images during the simulation.")
-parser.add_argument("--scenario_type", type=str, default="static", choices=['clean', 'static', 'dynamic'])
 parser.add_argument(
     "--color_scheme",
     type=str,
@@ -92,21 +90,6 @@ from urbansim.primitives.navigation.pg_env_cfg import SceneCfg, ObservationsCfg,
 from urbansim.primitives.robot.coco import COCO_CFG, COCOVelocityActionsCfg, COCONavModifyEnv
 
 COCO_CFG.init_state.pos = (1.0, 1.0, 0.5)
-pg_config = dict(
-    type=args_cli.scenario_type, # [clean, static, dynamic]
-    with_terrain=args_cli.use_terrain,
-    with_boundary=True,
-    map_region=20,
-    buffer_width=1,
-    num_object=13,
-    num_pedestrian=4,
-    walkable_seed=0,
-    non_walkable_seed=1,
-    seed=423,
-    unique_env_num=20,
-    ped_forward_inteval=10,
-    moving_max_t=80,
-)
 
 """
 Define the Environment
@@ -114,9 +97,9 @@ Define the Environment
 @configclass
 class ViewerCfg:
     """Configuration of the scene viewport camera."""
-    eye: tuple[float, float, float] = (-150, -150, 25.2)
+    eye: tuple[float, float, float] = (-50, -75, 15)
 
-    lookat: tuple[float, float, float] = (100, 100, -5)
+    lookat: tuple[float, float, float] = (120, 100, -5)
 
     cam_prim_path: str = "/OmniverseKit_Persp"
 
