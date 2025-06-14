@@ -53,6 +53,13 @@ class BaseBlock:
         Sample a new topology to fill self.block_network
         """
         raise NotImplementedError
+    
+    def sample_parameters(self):
+        """
+        Sample parameters for the block, such as origin point, name, etc.
+        This method should be overridden in subclasses to define specific parameters.
+        """
+        raise NotImplementedError
 
     def construct_block(
         self,
@@ -65,29 +72,7 @@ class BaseBlock:
         """
         self.sample_parameters()
 
-        if not isinstance(self.origin, NodePath):
-            self.origin = NodePath(self.name)
-        # else:
-        #     print("Origin already exists: ", self.origin)
-
-        self._block_objects = []
-        if extra_config:
-            assert set(extra_config.keys()).issubset(self.PARAMETER_SPACE.parameters), \
-                "Make sure the parameters' name are as same as what defined in pg_space.py"
-            raw_config = self.get_config(copy=True)
-            raw_config.update(extra_config)
-            self.update_config(raw_config)
-        self._clear_topology()
         success = self._sample_topology()
-        self._global_network.add(self.block_network, no_same_node)
-
-        self._create_in_world()
-        self.attach_to_world(root_render_np, physics_world)
-
-        # self.draw_polygons_in_network_block(self.block_network)
-
-        if not attach_to_world:
-            self.detach_from_world(physics_world)
 
         return success
 
