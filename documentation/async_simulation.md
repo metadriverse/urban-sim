@@ -60,17 +60,17 @@ Different scenario types can be combined with both simulation modes. For example
 - `dynamic` (with moving pedestrians)
 
 <div align="center">
-  <video src="./assets/sync_clean.gif" width="30%" controls></video>
-  <video src="./assets/sync_static.gif" width="30%" controls></video>
-  <video src="./assets/sync_dynamic.gif" width="30%" controls></video>
+  <img src="./assets/sync_clean.gif" width="30%"></img>
+  <img src="./assets/sync_static.gif" width="30%" ></img>
+  <img src="./assets/sync_dynamic.gif" width="30%"></img>
   <br>
   <p>Sync - Clean &nbsp;&nbsp;&nbsp;&nbsp; Sync - Static &nbsp;&nbsp;&nbsp;&nbsp; Sync - Dynamic</p>
 </div>
 
 <div align="center">
-  <video src="./assets/async_clean.gif" width="30%" controls></video>
-  <video src="./assets/async_static.gif" width="30%" controls></video>
-  <video src="./assets/async_dynamic.gif" width="30%" controls></video>
+  <img src="./assets/async_clean.gif" width="30%" ></img>
+  <img src="./assets/async_static.gif" width="30%" ></img>
+  <img src="./assets/async_dynamic.gif" width="30%"></img>
   <br>
   <p>Async - Clean &nbsp;&nbsp;&nbsp;&nbsp; Async - Static &nbsp;&nbsp;&nbsp;&nbsp; Async - Dynamic</p>
 </div>
