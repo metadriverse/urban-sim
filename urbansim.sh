@@ -135,6 +135,18 @@ advanced_install() {
     # This function is a placeholder for advanced installation commands.
     # Currently, it does nothing but can be extended in the future.
     echo "[INFO] Running advanced installation commands..."
+    python_exe=$(extract_python_exe)
+    echo "[INFO] Using python from: ${python_exe}"
+
+    # Derive site-packages path
+    site_packages_dir=$(${python_exe} -c "import site; print(site.getsitepackages()[0])")
+    target_rl_games="${site_packages_dir}/rl_games"
+    echo "[INFO] Target rl_games path: ${target_rl_games}"
+
+    # Copy your custom rl_games
+    echo "[INFO] Replacing rl_games with local rl_source/..."
+    rm -rf "${target_rl_games}"
+    cp -r rl_source "${target_rl_games}"
 
     pip install -e meta_source/metadrive/
     pip install -e meta_source/metaurban/
