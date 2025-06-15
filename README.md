@@ -101,6 +101,9 @@ In addition to random object placement, we provid procedural generation (PG) pip
 python urbansim/envs/separate_envs/pg_env.py --enable_cameras --num_envs ${NUM_ENV} --use_async
 ```
 
+More details, comparisons, and target results can be found in:
+[Scenarios](documentation/scenario_generation.md) and [AsyncSimulation](documentation/async_simulation.md)
+
 ## 🚀 Reinforcement Learning
 We train policies by specifying configuration files, which define environment settings, algorithm parameters, and training options. For example,
 
@@ -126,8 +129,9 @@ For frequently asked questions about installing, RL training and other modules, 
 Can't find the answer to your question? Try asking the developers and community on our Discussions forum.
 
 ## 📌 TODOs
-- [x] Release evaluation code with mini-town assets.
-- [x] Release pretrained models.
+- [ ] Release evaluation code with MiniTown assets.
+- [ ] Release pretrained models along with full training configurations.
+- [ ] Release a lightweight procedural generation pipeline.
 
 ## 💘 Acknowledgement
 The simulator can not be built without the help from Panda3D community and the following open-sourced projects:
