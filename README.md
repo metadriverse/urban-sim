@@ -21,7 +21,7 @@
 </div>
 
 ## Latest Updates
-- [Jun/13/2025] **v0.0.1**: The first official release of URBAN-SIM.
+- [Jun/15/2025] **v0.0.1**: The first official release of URBAN-SIM.
 
 ## Table of Contents
 TODO
@@ -82,19 +82,51 @@ It should be noted that you should install several dependencies including ```isa
 ## 🏃‍♂️ Simulation Environment
 
 We provide examples to demonstrate features and basic usages of URBAN-SIM after the local installation.
-### Synchronous Navigation Environment
-In synchronous navigation environments, spawned 
 
 ### Asynchronous Navigation Environment
+We provide source code and scripts to extend and customize the asynchronous navigation environment, enabling users to develop navigation policies and integrate with various robot embodiments.
+```bash
+python urbansim/envs/separate_envs/random_env.py --enable_cameras --num_envs ${NUM_ENV} --scenario_type ${TYPE} --use_async
+```
+- `--enable_cameras`: Enables vision-based observation space.
+- `NUM_ENV`: Number of parallel environments to simulate (e.g., 256).
+- `TYPE`: `{clean, static, dynamic}`  
+  - `clean`: No obstacles or pedestrians  
+  - `static`: Includes static obstacles  
+  - `dynamic`: Includes static obstacles and moving pedestrians
+- `--use_async`: Launches environments in asynchronous stepping mode, enabling diverse simulation timings across parallel agents.
 
-In a point navigation environment, there will be only static objects besides the ego agent in the scenario.
+In addition to random object placement, we provid procedural generation (PG) pipeline enables scalable creation of large-scale, structured environments—such as MetaUrban layouts—for reinforcement learning at scale.
+```bash
+python urbansim/envs/separate_envs/pg_env.py --enable_cameras --num_envs ${NUM_ENV} --use_async
+```
 
 ## 🚀 Reinforcement Learning
+We train policies by specifying configuration files, which define environment settings, algorithm parameters, and training options. For example,
+
+```bash
+python urbansim/learning/RL/train.py --env configs/env_configs/navigation/coco.yaml --enable_cameras
+```
+
+For PPO training, you can change the parameters in the configuration files to adjust learning rate, number of steps, entropy regularization, and other hyperparameters.
+
+We adopt different training backends tailored to specific tasks:
+
+- `Locomotion` is trained with the RSL-RL framework, which provides fast and stable low-level control.
+
+- `Navigation` is trained with the rl-games framework, which supports training with flexible network architectures.
+
+You don’t need to install these frameworks separately — all dependencies are installed via ```urbansim.sh```.
+
 
 ## 📖 Questions and Support
 
-## 📌 TODOs
+For frequently asked questions about installing, RL training and other modules, please refer to:  [FAQs](documentation/FAQs.md)
 
+Can't find the answer to your question? Try asking the developers and community on our Discussions forum.
+
+## 📌 TODOs
+- [x]
 
 ## 💘 Acknowledgement
 The simulator can not be built without the help from Panda3D community and the following open-sourced projects:
