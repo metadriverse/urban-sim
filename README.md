@@ -36,7 +36,7 @@ To ensure the best experience with **URBAN-SIM**, please review the following ha
   - **OS**: Ubuntu 22.04; 24.04.
   - **GPU**: Nvidia GPU with at least **16GB RAM** and **12GB VRAM**.
     - Tested GPUs: **Nvidia RTX-4080, RTX-4090, L40S**.   
-  - **Storage**: Minimum of **20GB free space**.  
+  - **Storage**: Minimum of **50GB free space**.  
 
 ### Installation
 #### 1. Install IsaacSim 4.5

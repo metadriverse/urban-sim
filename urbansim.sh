@@ -24,12 +24,13 @@ echo "[INFO] URBANSIM_PATH is set to ${URBANSIM_PATH}"
 
 # print the usage description
 print_help () {
-    echo -e "\nusage: $(basename "$0") [-h] [-i] [-v] [-c] -- Utility to manage URBAN-SIM."
+    echo -e "\nusage: $(basename "$0") [-h] [-i] [-v] [-c] [-a] -- Utility to manage URBAN-SIM."
     echo -e "\noptional arguments:"
     echo -e "\t-h, --help           Display the help content."
     echo -e "\t-i, --install        Install the extensions inside URBAN-SIM and learning frameworks as extra dependencies."
     echo -e "\t-v, --vscode         Generate the VSCode settings file from template."
     echo -e "\t-c, --conda [NAME]   Create the conda environment for URBAN-SIM. Default name is 'urbansim'."
+    echo -e "\t-a, --advanced       Run the advanced command."
     echo -e "\n" >&2
 }
 
@@ -128,6 +129,23 @@ setup_conda_env() {
     echo -e "\t\t2. To install URBAN-SIM extensions, run:            urbansim.sh -i"
     echo -e "\t\t5. To deactivate the environment, run:              conda deactivate"
     echo -e "\n"
+}
+
+advanced_install() {
+    # This function is a placeholder for advanced installation commands.
+    # Currently, it does nothing but can be extended in the future.
+    echo "[INFO] Running advanced installation commands..."
+
+    pip install -e meta_source/metadrive/
+    pip install -e meta_source/metaurban/
+
+    pip install stable_baselines3 imitation tensorboard wandb scikit-image pyyaml gdown pybind11[global] jax chex
+
+    cd ${URBANSIM_PATH}/meta_source/metaurban/metaurban/orca_algo/
+    rm -rf build/
+    bash compile.sh
+
+    cd ${URBANSIM_PATH}
 }
 
 # extract the python from isaacsim
@@ -276,6 +294,13 @@ while [[ $# -gt 0 ]]; do
             echo "[INFO] Using python from: ${python_exe}"
             shift # past argument
             ${python_exe} "$@"
+            # exit neatly
+            break
+            ;;
+        -a|--advanced)
+            # run the advanced command
+            echo "[INFO] Running advanced command..."
+            advanced_install
             # exit neatly
             break
             ;;
