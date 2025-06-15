@@ -30,14 +30,8 @@
     - [Installation](#installation)
   - [🏃‍♂️ Simulation Environment](#️-simulation-environment)
     - [Asynchronous Navigation Environment](#-asynchronous-navigation-environment)
-  - [🚀 Model Training and Evaluation](#-model-training-and-evaluation)
-    - [Reinforcement Learning](#reinforcement-learning)
-      - [Training](#training)
-      - [Evaluation](#evaluation)
-    - [Imitation Learning](#imitation-learning)
-      - [Data collection](#data-collection)
-      - [Training](#training)
-  - [📖 Questions and Support](#questions-and-support)
+  - [🚀 Reinforcement Learning](#-reinforcement-learning)
+  - [📖 Questions and Support](#-questions-and-support)
   - [📎 Citation](#-citation)
 
 ## 🛠 Getting Started
