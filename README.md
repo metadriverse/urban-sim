@@ -29,7 +29,7 @@
     - [Hardware Recommendations](#hardware-recommendations)
     - [Installation](#installation)
   - [🏃‍♂️ Simulation Environment](#️-simulation-environment)
-    - [Asynchronous Navigation Environment](#-asynchronous-navigation-environment)
+    - [Asynchronous Navigation Environment](#asynchronous-navigation-environment)
   - [🚀 Reinforcement Learning](#-reinforcement-learning)
   - [📖 Questions and Support](#-questions-and-support)
   - [📎 Citation](#-citation)
