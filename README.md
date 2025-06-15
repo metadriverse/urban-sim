@@ -126,7 +126,8 @@ For frequently asked questions about installing, RL training and other modules, 
 Can't find the answer to your question? Try asking the developers and community on our Discussions forum.
 
 ## 📌 TODOs
-- [x]
+- [x] Release evaluation code with mini-town assets.
+- [x] Release pretrained models.
 
 ## 💘 Acknowledgement
 The simulator can not be built without the help from Panda3D community and the following open-sourced projects:
