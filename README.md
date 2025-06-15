@@ -132,9 +132,7 @@ You don’t need to install these frameworks separately — all dependencies are
 
 ## 📖 Questions and Support
 
-For frequently asked questions about installing, RL training and other modules, please refer to:  [FAQs](documentation/FAQs.md)
-
-Can't find the answer to your question? Try asking the developers and community on our Discussions forum.
+Can't run URBAN-SIM correctly? Try posting issues or asking the developers and community in our Discussions forum.
 
 ## 📌 TODOs
 - [ ] Release evaluation code with MiniTown assets.
