@@ -12,7 +12,7 @@
 
 <br/>
 
-🚀 **URBAN-SIM will be released before CVPR 2025. Please stay tuned!**
+🚀 **We are in active code structure polishing. URBAN-SIM will be released by July 5. Please stay tuned!**
 
 
 
