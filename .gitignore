@@ -58,6 +58,8 @@ _build
 **/runs/*
 **/logs/*
 **/recordings/*
+**/logged_videos/*
+
 
 # Pre-Trained Checkpoints
 /.pretrained_checkpoints/
