@@ -604,7 +604,7 @@ class CameraTagStateKey:
 import random, os
 class PedestrianAssetPaths:
     global PEDESTRIAN_ROOT, RP_PEDESTRIAN_MOTIONS, SYNBODY_PEDESTRIAN_MOTIONS
-    PEDESTRIAN_ROOT = os.path.abspath("./metaurban/assets_pedestrain/") + "/"
+    PEDESTRIAN_ROOT = os.path.abspath("./assets/pedestrians/") + "/"
     
     @staticmethod
     def get_random_texture():
@@ -671,6 +671,7 @@ class PedestrianAssetPaths:
     PEDESTRIAN_ACTORS_BATCH = [] #{}
     from glob import glob
     ### SYNBODY ###   # -> has root center offset problem -> 1100 assets -32 -> 1067 # 71kpts
+    print('PedestrianAssetPaths: loading synbody actors from ', PEDESTRIAN_ROOT + 'SynBody_actor/converted/*.gltf')
     syn_actors = list(glob(PEDESTRIAN_ROOT + 'SynBody_actor/converted/*.gltf'))
     random.shuffle(syn_actors)
     

@@ -163,9 +163,12 @@ class UrbanScene(InteractiveScene):
         # store inputs
         self.cfg = cfg
         # HACK: disable physics replication to support procedural generation for infinite scenes
-        if self.cfg.scenario_generation_method is None:
+        try:
+            if self.cfg.scenario_generation_method is None:
+                self.cfg.scenario_generation_method = "predefined"
+                print(f'[INFO] scenario_generation_method is set to: {self.cfg.scenario_generation_method}')
+        except:
             self.cfg.scenario_generation_method = "predefined"
-            print(f'[INFO] scenario_generation_method is set to: {self.cfg.scenario_generation_method}')
         assert self.cfg.scenario_generation_method in ['async procedural generation', 
                                                        'sync procedural generation', 
                                                        'limited async procedural generation', 
@@ -190,35 +193,38 @@ class UrbanScene(InteractiveScene):
         self.house_region_polygons = [[] for _ in range(self.cfg.num_envs)]
         self.all_region_list = []
         self.walkable_terrain_list = []
-        
-        # unique static assets
-        self.unique_static_asset_path = []
-        if self.cfg.static_assets_path is None:
-            self.cfg.static_assets_path = f"{URBANSIM_PATH}/assets/usds/"
-            print(f'[INFO] static_assets_path: {self.cfg.static_assets_path}')
-        all_assets = os.listdir(self.cfg.static_assets_path)
-        all_assets = [asset for asset in all_assets if asset.endswith('.usd') and 'non_metric' not in asset]
-        self.unique_static_asset_path = [os.path.join(self.cfg.static_assets_path, asset) for asset in all_assets]
-        self.unique_static_asset_path = self.unique_static_asset_path[:min(len(self.unique_static_asset_path), self.cfg.maximum_static_object_number)]
-        print(f'[INFO] number of unique static assets: {len(self.unique_static_asset_path)}')
-        print('[INFO] example of unique static asset path:', self.unique_static_asset_path[0])
-        
-        # unique dynamic assets
-        self.unique_dynamic_asset_path = []
-        if self.cfg.dynamic_assets_path is None:
-            self.cfg.dynamic_assets_path = f"{URBANSIM_PATH}/assets/peds/"
-            print(f'[INFO] dynamic_assets_path: {self.cfg.dynamic_assets_path}')
-        all_assets = os.listdir(self.cfg.dynamic_assets_path)
-        self.unique_dynamic_asset_path = [os.path.join(self.cfg.dynamic_assets_path, asset, asset.split('_')[-1] + '.usd') for asset in all_assets]
-        self.unique_dynamic_asset_path = self.unique_dynamic_asset_path[:min(len(self.unique_dynamic_asset_path), self.cfg.maximum_dynamic_object_number)]
-        print(f'[INFO] number of unique dynamic assets: {len(self.unique_dynamic_asset_path)}')
-        print('[INFO] example of unique dynamic asset path:', self.unique_dynamic_asset_path[0])
-        
-        super(UrbanScene, self).__init__(self.cfg)
-        self.terrain_offsets = self._default_env_origins.cpu().numpy()
-        self.use_dynamic_pedestrians = False
-        print(f'[INFO] use_dynamic_pedestrians: {self.use_dynamic_pedestrians}')
-        self.count = 0
+        try:
+            # unique static assets
+            self.unique_static_asset_path = []
+            if self.cfg.static_assets_path is None:
+                self.cfg.static_assets_path = f"{URBANSIM_PATH}/assets/usds/"
+                print(f'[INFO] static_assets_path: {self.cfg.static_assets_path}')
+            all_assets = os.listdir(self.cfg.static_assets_path)
+            all_assets = [asset for asset in all_assets if asset.endswith('.usd') and 'non_metric' not in asset]
+            self.unique_static_asset_path = [os.path.join(self.cfg.static_assets_path, asset) for asset in all_assets]
+            self.unique_static_asset_path = self.unique_static_asset_path[:min(len(self.unique_static_asset_path), self.cfg.maximum_static_object_number)]
+            print(f'[INFO] number of unique static assets: {len(self.unique_static_asset_path)}')
+            print('[INFO] example of unique static asset path:', self.unique_static_asset_path[0])
+            
+            # unique dynamic assets
+            self.unique_dynamic_asset_path = []
+            if self.cfg.dynamic_assets_path is None:
+                self.cfg.dynamic_assets_path = f"{URBANSIM_PATH}/assets/peds/"
+                print(f'[INFO] dynamic_assets_path: {self.cfg.dynamic_assets_path}')
+            all_assets = os.listdir(self.cfg.dynamic_assets_path)
+            self.unique_dynamic_asset_path = [os.path.join(self.cfg.dynamic_assets_path, asset, asset.split('_')[-1] + '.usd') for asset in all_assets]
+            self.unique_dynamic_asset_path = self.unique_dynamic_asset_path[:min(len(self.unique_dynamic_asset_path), self.cfg.maximum_dynamic_object_number)]
+            print(f'[INFO] number of unique dynamic assets: {len(self.unique_dynamic_asset_path)}')
+            print('[INFO] example of unique dynamic asset path:', self.unique_dynamic_asset_path[0])
+            
+            super(UrbanScene, self).__init__(self.cfg)
+            self.terrain_offsets = self._default_env_origins.cpu().numpy()
+            self.use_dynamic_pedestrians = False
+            print(f'[INFO] use_dynamic_pedestrians: {self.use_dynamic_pedestrians}')
+            self.count = 0
+        except Exception as e:
+            super(UrbanScene, self).__init__(self.cfg)
+            self.use_dynamic_pedestrians = False
     
     def _add_entities_from_cfg(self, procedural_generation=False):
         """Add scene entities from the config."""
@@ -1309,43 +1315,84 @@ class UrbanScene(InteractiveScene):
                 objects = []
                 if generation_cfg['type'] == 'dynamic':
                     print(f'[INFO] Using dynamic pedestrians in the scene, the objects will not be placed in centeric regions.')
+                    
+                grid_size = 0.1  
+                margin = 2.0    
+
+                x_min = tmp_origin[env_idx, 0] + margin
+                x_max = tmp_origin[env_idx, 0] + area_size[0]
+                y_min = tmp_origin[env_idx, 1] + margin
+                y_max = tmp_origin[env_idx, 1] + area_size[1]
+
+                x_coords = np.arange(x_min, x_max, grid_size)
+                y_coords = np.arange(y_min, y_max, grid_size)
+                grid_set = set((round(x, 4), round(y, 4)) for x in x_coords for y in y_coords)
+
+                neighbor_offsets = [(-1, -1), (-1, 0), (-1, 1),
+                                    (0, -1),  (0, 0),  (0, 1),
+                                    (1, -1),  (1, 0),  (1, 1)]
+
+                
                 for n_obj in range(num_objects):
                     try_times = 0
-                    while True:
-                        try_times += 1
-                        if try_times > 20:
-                            print(f"[Warning] Failed to generate object after {try_times} tries.")
-                            break
-                        random_x = np.random.uniform(tmp_origin[env_idx, 0] + 1, tmp_origin[env_idx, 0] + area_size[0])
-                        random_y = np.random.uniform(tmp_origin[env_idx, 1] + 1, tmp_origin[env_idx, 1] + area_size[1])
-                        if generation_cfg['type'] == 'dynamic':
-                            if np.random.rand() < 0.5:
-                                random_x = np.random.uniform(tmp_origin[env_idx, 0] + 1, tmp_origin[env_idx, 0] + area_size[0])
-                                random_y = np.random.uniform(tmp_origin[env_idx, 1] + 1, tmp_origin[env_idx, 1] + area_size[1] / 4)
-                            else:
-                                random_x = np.random.uniform(tmp_origin[env_idx, 0] + 1, tmp_origin[env_idx, 0] + area_size[0])
-                                random_y = np.random.uniform(tmp_origin[env_idx, 1] + area_size[1] * 3 / 4, tmp_origin[env_idx, 1] + area_size[1] - 1)
-                        point = Point(random_x, random_y)
-                        if polygon_boundary.contains(point):
-                            flag = False
-                            if len(objects) > 0:
-                                for obj_cur in objects:
+                    if generation_cfg['type'] != 'dynamic' and generation_cfg.get('use_grid', True):
+                        while True:
+                            try_times += 1
+                            if try_times > 20:
+                                print(f"[Warning] Failed to place object {n_obj} after {try_times} tries.")
+                                break
+                            if len(grid_set) == 0:
+                                print("[Warning] No more available grid positions.")
+                                break
+
+                            candidate = np.random.choice(len(grid_set))
+                            candidate_pos = list(grid_set)[candidate]
+                            random_x, random_y = candidate_pos
+                            obj_position = [random_x, random_y, 0]
+                            object_positions.append(obj_position)
+                            is_valid = True
+                            if is_valid:
+                                for dx, dy in neighbor_offsets:
+                                    nx = round(random_x + dx * grid_size, 4)
+                                    ny = round(random_y + dy * grid_size, 4)
+                                    grid_set.discard((nx, ny)) 
+                                break
+                    else:
+                        while True:
+                            try_times += 1
+                            if try_times > 20:
+                                print(f"[Warning] Failed to generate object after {try_times} tries.")
+                                break
+                            random_x = np.random.uniform(tmp_origin[env_idx, 0] + 1, tmp_origin[env_idx, 0] + area_size[0])
+                            random_y = np.random.uniform(tmp_origin[env_idx, 1] + 1, tmp_origin[env_idx, 1] + area_size[1])
+                            if generation_cfg['type'] == 'dynamic':
+                                if np.random.rand() < 0.5:
+                                    random_x = np.random.uniform(tmp_origin[env_idx, 0] + 1, tmp_origin[env_idx, 0] + area_size[0])
+                                    random_y = np.random.uniform(tmp_origin[env_idx, 1] + 1, tmp_origin[env_idx, 1] + area_size[1] / 4)
+                                else:
+                                    random_x = np.random.uniform(tmp_origin[env_idx, 0] + 1, tmp_origin[env_idx, 0] + area_size[0])
+                                    random_y = np.random.uniform(tmp_origin[env_idx, 1] + area_size[1] * 3 / 4, tmp_origin[env_idx, 1] + area_size[1] - 1)
+                            point = Point(random_x, random_y)
+                            if polygon_boundary.contains(point):
+                                flag = False
+                                if len(objects) > 0:
+                                    for obj_cur in objects:
+                                        obj_position = [random_x, random_y, 0]
+                                        obj = trimesh.primitives.Sphere(radius=buffer_width, center=obj_position)
+                                        if not obj.intersection(obj_cur).vertices.shape[0] and not obj_cur.intersection(obj).vertices.shape[0]:
+                                            objects.append(obj)
+                                            object_positions.append(obj_position)
+                                            flag = True
+                                            break
+                                else:
                                     obj_position = [random_x, random_y, 0]
                                     obj = trimesh.primitives.Sphere(radius=buffer_width, center=obj_position)
-                                    if not obj.intersection(obj_cur).vertices.shape[0] and not obj_cur.intersection(obj).vertices.shape[0]:
-                                        objects.append(obj)
-                                        object_positions.append(obj_position)
-                                        flag = True
-                                        break
-                            else:
-                                obj_position = [random_x, random_y, 0]
-                                obj = trimesh.primitives.Sphere(radius=buffer_width, center=obj_position)
-                                objects.append(obj)
-                                object_positions.append(obj_position)
-                                flag = True
-                            if flag:
-                                break
-                
+                                    objects.append(obj)
+                                    object_positions.append(obj_position)
+                                    flag = True
+                                if flag:
+                                    break
+                    
                 if not hasattr(self, 'tmp_object_positions'):
                     self.tmp_object_positions = [copy.deepcopy([
                         [
@@ -1620,8 +1667,8 @@ class UrbanScene(InteractiveScene):
         self.logical_engine.register_manager('map_manager', PGMapManager())
         if self.cfg.pg_config['type'] != 'clean':
             self.logical_engine.register_manager('asset_manager', AssetManager())
-        # if self.cfg.pg_config['type'] == 'dynamic':
-        #     self.logical_engine.register_manager('human_manager', PGBackgroundSidewalkAssetsManager())
+        if self.cfg.pg_config['type'] == 'dynamic':
+            self.logical_engine.register_manager('human_manager', PGBackgroundSidewalkAssetsManager())
         print(f'[INFO] Logical engine is created.')
         
         # reset engine
@@ -1687,6 +1734,145 @@ class UrbanScene(InteractiveScene):
                     init_state=RigidObjectCfg.InitialStateCfg(rot=primpath_usd_pos_rot_scale[3], pos=primpath_usd_pos_rot_scale[2]),
                 )
                 setattr(updated_cfg, f'object_cfg_list_{idx:04d}', rigid_cfg)
+        from metaurban.policy.get_planning import get_planning
+        if self.cfg.pg_config['type'] == 'dynamic':
+            self.use_dynamic_pedestrians = True
+            print(f'[INFO] use_dynamic_pedestrians->True: Using dynamic pedestrians in the scene.')
+            self.dynamic_asset_animatable_state()
+            print('[INFO] dynamic asset animatable state is set.')
+            
+            # orca planning
+            l, n, st, el = get_planning(
+                [engine.human_manager.start_points],
+                
+                [engine.human_manager._get_walkable_regions(engine.map_manager.current_map)],
+                
+                [engine.human_manager.end_points],
+                
+                [len(engine.human_manager.start_points)],
+                
+                1
+            )
+            n[0][..., 0] -=  engine.human_manager.mask_translate[0]
+            n[0][..., 1] -=  engine.human_manager.mask_translate[1]
+            interpolated_traj = torch.from_numpy(n[0]).permute(1, 0, 2).to(self.device)
+            
+            # register the Pedestrian dataset cache
+            prims_utils.create_prim("/World/DatasetDynamic", "Scope")
+            dynamic_proto_prim_paths = list()
+
+            for human_id, human_info in enumerate(self.unique_dynamic_asset_path):
+                proto_prim_path = f"/World/DatasetDynamic/Human_{human_id:04d}"
+                proto_asset_config = sim_utils.UsdFileCfg(
+                    scale=(0.01, 0.01, 0.01),
+                    usd_path=human_info,
+                )
+                prim = proto_asset_config.func(proto_prim_path, proto_asset_config)
+                # save the proto prim path
+                dynamic_proto_prim_paths.append(proto_prim_path)
+                # set the prim visibility
+                if hasattr(proto_asset_config, "visible"):
+                    imageable = UsdGeom.Imageable(prim)
+                    if proto_asset_config.visible:
+                        imageable.MakeVisible()
+                    else:
+                        imageable.MakeInvisible()
+                # set the semantic annotations
+                if hasattr(proto_asset_config, "semantic_tags") and proto_asset_config.semantic_tags is not None:
+                    # note: taken from replicator scripts.utils.utils.py
+                    for semantic_type, semantic_value in proto_asset_config.semantic_tags:
+                        # deal with spaces by replacing them with underscores
+                        semantic_type_sanitized = semantic_type.replace(" ", "_")
+                        semantic_value_sanitized = semantic_value.replace(" ", "_")
+                        # set the semantic API for the instance
+                        instance_name = f"{semantic_type_sanitized}_{semantic_value_sanitized}"
+                        sem = Semantics.SemanticsAPI.Apply(prim, instance_name)
+                        # create semantic type and data attributes
+                        sem.CreateSemanticTypeAttr()
+                        sem.CreateSemanticDataAttr()
+                        sem.GetSemanticTypeAttr().Set(semantic_type)
+                        sem.GetSemanticDataAttr().Set(semantic_value)
+                # activate rigid body contact sensors
+                if hasattr(proto_asset_config, "activate_contact_sensors") and proto_asset_config.activate_contact_sensors:
+                    sim_utils.activate_contact_sensors(proto_prim_path, proto_asset_config.activate_contact_sensors)
+            
+            human_prim_path_list = []
+            num_pedestrian = generation_cfg['num_pedestrian']
+            grid_split = int(math.sqrt(num_pedestrian) + 0.5) + 1
+
+            x_bins = np.linspace(0, 1, grid_split)  # [0, 0.25, 0.5, 0.75, 1.0]
+            x_start_left = x_bins[:-1]  # [0, 0.25, 0.5, 0.75]
+            y_bins = np.linspace(0.25, 0.75, grid_split)  # [0, 0.25, 0.5, 0.75, 1.0]
+            y_start_left = y_bins[:-1]  # [0.25, 0.5, 0.75, 1.0]
+            pedestrian_forward_backward_heading_list = []
+            pedestrain_forward_start_end_pos_list = []
+            for env_idx in range(self.num_envs):
+                for human_idx in range(num_pedestrian):
+                    prim_path=f"/World/envs/env_{env_idx}/" + f"Dynamic_" + f'{human_idx:04d}'
+                    grid_i = human_idx // (grid_split - 1)
+                    grid_j = human_idx % (grid_split - 1)
+                    grid_i = min(grid_i, len(x_start_left) - 1)
+                    grid_j = min(grid_j, len(y_start_left) - 1)
+                    start_x = x_start_left[grid_i] * area_size[0]
+                    start_y = y_start_left[grid_j] * area_size[1]
+                    
+                    from scipy.spatial.transform import Rotation as R
+                    if np.random.rand() < 0.5:
+                        direction = 'y+'
+                        delta_rot = np.pi
+                    else:
+                        direction = 'x+'
+                        delta_rot = np.pi / 2
+                    delta_rotation = R.from_euler('y', delta_rot)
+                    default_quat = [0.5, 0.5, 0.5, 0.5] 
+                    rotation = R.from_quat(default_quat)
+                    # Apply the heading rotation to the current rotation
+                    new_rotation =  rotation * delta_rotation
+                    new_quat = new_rotation.as_quat()
+                    qw, qx, qy, qz = new_quat[3], new_quat[0], new_quat[1], new_quat[2]
+                    
+                    delta_rotation = R.from_euler('y', delta_rot - np.pi)
+                    # Apply the heading rotation to the current rotation
+                    new_rotation =  rotation * delta_rotation
+                    new_quat = new_rotation.as_quat()
+                    qw_inv, qx_inv, qy_inv, qz_inv = new_quat[3], new_quat[0], new_quat[1], new_quat[2]
+                    pedestrian_forward_backward_heading_list.append(
+                        [
+                            [qw, qx, qy, qz],  # forward heading
+                            [qw_inv, qx_inv, qy_inv, qz_inv]  # backward heading
+                        ]
+                    )
+                    if direction == 'y+':
+                        pedestrain_forward_start_end_pos_list.append(
+                            [
+                                [start_x, start_y, 1.30],  # forward start position
+                                [start_x, start_y + area_size[1] * (y_start_left[1] - y_start_left[0]) * 0.7, 1.30]  # forward end position
+                            ]
+                        )
+                    elif direction == 'x+':
+                        pedestrain_forward_start_end_pos_list.append(
+                            [
+                                [start_x, start_y, 1.30],  # forward start position
+                                [start_x + area_size[0] * (x_start_left[1] - x_start_left[0]) * 0.7, start_y, 1.30]  # forward end position
+                            ]
+                        )
+                    
+                    human_prim_path_list.append(
+                            [
+                                np.random.choice(dynamic_proto_prim_paths), prim_path, [start_x, start_y, 1.30], (qw, qx, qy, qz)
+                            ]
+                        )
+            all_human_config = RigidObjectCfg(
+                prim_path="/World/envs/env_*/Dynamic_*",
+                spawn=DiversHumanCfg(
+                    assets_cfg=human_prim_path_list
+                )
+            )
+            all_human_config.prim_path = all_human_config.prim_path.format(ENV_REGEX_NS=self.env_regex_ns)
+            if hasattr(all_human_config, "collision_group") and all_human_config.collision_group == -1:
+                asset_paths = sim_utils.find_matching_prim_paths(all_human_config.prim_path)
+                self._global_prim_paths += asset_paths
+            self._rigid_objects['all_human_config'] = all_human_config.class_type(all_human_config)
         
         self.cfg = updated_cfg
         # generate and spawn scene

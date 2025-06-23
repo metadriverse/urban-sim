@@ -57,12 +57,12 @@ class AnymalCNavActionsCfg:
     """Action specifications for the MDP."""
     pre_trained_policy_action: nmdp.PreTrainedPolicyActionCfg = nmdp.PreTrainedPolicyActionCfg(
         asset_name="robot",
-        policy_path=f"assets/ckpts/locomotion/anymal_C/general.pt",
+        policy_path=f"assets/ckpts/locomotion/anymal_C.pt",
         low_level_decimation=4,
         low_level_actions=mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*"], scale=0.5, use_default_offset=True),
         low_level_observations=loc_ObservationsCfg.PolicyCfg(),
         debug_vis=False,
-        align_heading_with_velocity=False,
+        align_heading_with_velocity=True,
     )
 
 # ============================

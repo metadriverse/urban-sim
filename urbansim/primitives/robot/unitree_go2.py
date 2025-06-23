@@ -73,9 +73,9 @@ def GO2RoughModifyEnv(env):
     # event
     env.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/base"
     # scale down the terrains because the robot is small
-    # env.scene.terrain.terrain_generator.sub_terrains["boxes"].grid_height_range = (0.025, 0.1)
-    # env.scene.terrain.terrain_generator.sub_terrains["random_rough"].noise_range = (0.01, 0.06)
-    # env.scene.terrain.terrain_generator.sub_terrains["random_rough"].noise_step = 0.01
+    env.scene.terrain.terrain_generator.sub_terrains["boxes"].grid_height_range = (0.025, 0.1)
+    env.scene.terrain.terrain_generator.sub_terrains["random_rough"].noise_range = (0.01, 0.06)
+    env.scene.terrain.terrain_generator.sub_terrains["random_rough"].noise_step = 0.01
 
     # reduce action scale
     env.actions.joint_pos.scale = 0.25
@@ -114,15 +114,6 @@ def GO2RoughModifyEnv(env):
     env.rewards.flat_orientation_l2.weight = -2.5
     env.rewards.feet_air_time.weight = 0.25
 
-    # change terrain to flat
-    env.scene.terrain.terrain_type = "plane"
-    env.scene.terrain.terrain_generator = None
-    # no height scan
-    env.scene.height_scanner = None
-    env.observations.policy.height_scan = None
-    # no terrain curriculum
-    env.curriculum.terrain_levels = None
-
 
 # ============================
 # Navigation
@@ -132,13 +123,17 @@ class GO2NavActionsCfg:
     """Action specifications for the MDP."""
     pre_trained_policy_action: nmdp.PreTrainedPolicyActionCfg = nmdp.PreTrainedPolicyActionCfg(
         asset_name="robot",
-        policy_path=f"assets/ckpts/locomotion/unitree_go2/general.pt",
+        policy_path=f"assets/ckpts/locomotion/unitree_go2.pt",
         low_level_decimation=4,
         low_level_actions=mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*"], scale=0.25, use_default_offset=True),
         low_level_observations=loc_ObservationsCfg.PolicyCfg(),
         debug_vis=False,
-        align_heading_with_velocity=False,
+        align_heading_with_velocity=True,
     )
+
+def GO2NavModifyEnv(env):
+    env.terminations.collision.params['sensor_cfg'].body_names = ["base", ".*_thigh"]
+    return env
 
 # ============================
 # Trainig Config

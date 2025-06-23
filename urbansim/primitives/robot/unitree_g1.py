@@ -186,13 +186,53 @@ class G1NavActionsCfg:
     """Action specifications for the MDP."""
     pre_trained_policy_action: nmdp.PreTrainedPolicyActionCfg = nmdp.PreTrainedPolicyActionCfg(
         asset_name="robot",
-        policy_path=f"assets/ckpts/locomotion/unitree_g1/general.pt",
+        policy_path=f"assets/ckpts/locomotion/unitree_g1.pt",
         low_level_decimation=4,
         low_level_actions=mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*"], scale=0.5, use_default_offset=True),
         low_level_observations=loc_ObservationsCfg.PolicyCfg(),
         debug_vis=False,
-        align_heading_with_velocity=False,
+        align_heading_with_velocity=True,
     )
+
+def G1NavModifyEnv(env):
+    from isaaclab.managers import EventTermCfg as EventTerm
+    env.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/head_link"
+    env.scene.camera.prim_path = "{ENV_REGEX_NS}/Robot/head_link/front_cam"
+    # env.scene.camera.offset=CameraCfg.OffsetCfg(pos=(0.510, 0.0, 1.3), rot=(0.5, -0.5, 0.5, -0.5), convention="ros")
+    # terminations
+    if hasattr(env.terminations, 'collision'):
+        env.terminations.collision.params["sensor_cfg"].body_names = "torso_link"
+        env.terminations.collision.params['threshold'] = 1.0
+    env.events.reset_robot_joints = EventTerm(
+        func=mdp.reset_joints_by_scale,
+        mode="reset",
+        params={
+            "position_range": (1.0, 1.0),
+            "velocity_range": (0.0, 0.0),
+        },
+    )
+    env.events.physics_material = EventTerm(
+        func=mdp.randomize_rigid_body_material,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
+            "static_friction_range": (0.8, 0.8),
+            "dynamic_friction_range": (0.6, 0.6),
+            "restitution_range": (0.0, 0.0),
+            "num_buckets": 64,
+        },
+    )
+    env.events.base_external_force_torque = EventTerm(
+        func=mdp.apply_external_force_torque,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names="torso_link"),
+            "force_range": (0.0, 0.0),
+            "torque_range": (-0.0, 0.0),
+        },
+    )
+    
+    return env
 
 # ============================
 # Trainig Config

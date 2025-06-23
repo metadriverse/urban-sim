@@ -195,15 +195,15 @@ else:
     pg_config = dict(
         type=setting_name, # [clean, static, dynamic]
         with_terrain=False,
-        with_boundary=True,
-        map_region=20,
+        with_boundary=env_config['Env'].get('with_boundary', True),
+        map_region=env_config['Env'].get('map_region', 30),
         buffer_width=1,
-        num_object=13,
-        num_pedestrian=4,
+        num_object=env_config['Env'].get('num_objects', 30),
+        num_pedestrian=env_config['Env'].get('num_peds', 4),
         walkable_seed=0,
         non_walkable_seed=1,
         seed=423,
-        unique_env_num=20,
+        unique_env_num=256,
         ped_forward_inteval=10,
         moving_max_t=80,
     )
@@ -253,11 +253,31 @@ else:
     if robot_name.lower() == 'coco':
         from urbansim.primitives.robot.coco import COCO_CFG
         from urbansim.primitives.robot.coco import COCOVelocityActionsCfg
-
         from urbansim.primitives.robot.coco import COCONavModifyEnv
+        
         robot_cfg = COCO_CFG
         action_cfg = COCOVelocityActionsCfg
         modify_env_fn = COCONavModifyEnv
+            
+    elif robot_name.lower() == 'unitree_go2':
+        from urbansim.primitives.robot.unitree_go2 import UNITREE_GO2_CFG
+        from urbansim.primitives.robot.unitree_go2 import GO2NavActionsCfg
+        from urbansim.primitives.robot.unitree_go2 import GO2NavModifyEnv
+        
+        robot_cfg = UNITREE_GO2_CFG
+        action_cfg = GO2NavActionsCfg
+        modify_env_fn = GO2NavModifyEnv
+        
+    elif robot_name.lower() == 'unitree_g1':
+        from urbansim.primitives.robot.unitree_g1 import G1_MINIMAL_CFG
+        from urbansim.primitives.robot.unitree_g1 import G1NavActionsCfg
+        from urbansim.primitives.robot.unitree_g1 import G1NavModifyEnv
+        
+        robot_cfg = G1_MINIMAL_CFG
+        action_cfg = G1NavActionsCfg
+        modify_env_fn = G1NavModifyEnv
+        
+    robot_cfg.init_state.pos = env_config['Robot'].get('init_pos', (1.0, 1.0, 0.4))
         
 # generate env cfg
 @configclass
@@ -265,10 +285,14 @@ class EnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
 
     # Scene settings
-    scene = scene_cfg(num_envs=env_config['Training']['num_envs'], 
-                      env_spacing=env_config['Omniverse']['env_spacing'],
-                      pg_config=pg_config,
-                      scenario_generation_method=env_config['Omniverse'].get('scenario_generation_method', None),)
+    if pg_config is None:
+        scene = scene_cfg(num_envs=env_config['Training']['num_envs'], 
+                          env_spacing=env_config['Omniverse']['env_spacing'],)
+    else:
+        scene = scene_cfg(num_envs=env_config['Training']['num_envs'], 
+                        env_spacing=env_config['Omniverse']['env_spacing'],
+                        pg_config=pg_config,
+                        scenario_generation_method=env_config['Omniverse'].get('scenario_generation_method', None),)
     # Basic settings
     observations = observation_cfg()
     actions = action_cfg()
@@ -438,7 +462,7 @@ def train_with_rsl(env_cfg: ManagerBasedRLEnvCfg, agent_cfg: RslRlOnPolicyRunner
         runner.load(resume_path)
         if args_cli.trace_model:
             print(f"[INFO]: Tracing model and saving to: {resume_path.replace('.pt', '_traced.pt')}")
-            trace_mdel = torch.jit.trace(runner.alg.policy.actor, torch.from_numpy(env.unwrapped.action_space.sample()).cuda()[0:1].reshape(1, -1))
+            trace_mdel = torch.jit.trace(runner.alg.policy.actor, torch.from_numpy(env.unwrapped.observation_space.sample()['policy']).cuda()[0:1].reshape(1, -1))
             trace_mdel.save(resume_path.replace('.pt', '_traced.pt'))
 
     # dump the configuration into log-directory
