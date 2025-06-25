@@ -334,6 +334,53 @@ def image_processed(
 
     return images.clone()
 
+def rgbd_processed(
+    env: ManagerBasedEnv,
+    sensor_cfg: SceneEntityCfg = SceneEntityCfg("tiled_camera"),
+    convert_perspective_to_orthogonal: bool = False,
+    normalize: bool = True,
+) -> torch.Tensor:
+    """Images of a specific datatype from the camera sensor.
+
+    If the flag :attr:`normalize` is True, post-processing of the images are performed based on their
+    data-types:
+
+    - "rgb": Scales the image to (0, 1) and subtracts with the mean of the current image batch.
+    - "depth" or "distance_to_camera" or "distance_to_plane": Replaces infinity values with zero.
+
+    Args:
+        env: The environment the cameras are placed within.
+        sensor_cfg: The desired sensor to read from. Defaults to SceneEntityCfg("tiled_camera").
+        data_type: The data type to pull from the desired camera. Defaults to "rgb".
+        convert_perspective_to_orthogonal: Whether to orthogonalize perspective depth images.
+            This is used only when the data type is "distance_to_camera". Defaults to False.
+        normalize: Whether to normalize the images. This depends on the selected data type.
+            Defaults to True.
+
+    Returns:
+        The images produced at the last time-step
+    """
+    # extract the used quantities (to enable type-hinting)
+    sensor: TiledCamera | Camera | RayCasterCamera = env.scene.sensors[sensor_cfg.name]
+
+    # obtain the input image
+    images = sensor.data.output['rgb']
+    depth = sensor.data.output['distance_to_camera']
+
+    # depth image conversion
+    if convert_perspective_to_orthogonal:
+        depth = math_utils.orthogonalize_perspective_depth(depth, sensor.data.intrinsic_matrices)
+
+    # rgb/depth image normalization
+    if normalize:
+        images = images.float() / 255.0
+        images = images.permute(0, 3, 1, 2)
+        B, C, H, W = images.shape
+        depth[depth == float("inf")] = 0
+        depth  =  depth.reshape(B, 1, H, W).clamp(0., 20.) / 20.
+
+    return torch.cat([images, depth], dim=1).clone()
+
 class image_features(ManagerTermBase):
     """Extracted image features from a pre-trained frozen encoder.
 
@@ -583,3 +630,18 @@ Commands.
 def generated_commands(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:
     """The generated command from command term in the command manager with the given name."""
     return env.command_manager.get_command(command_name)
+
+import torch
+def advanced_generated_commands(env: ManagerBasedRLEnv, command_name: str, max_dim: int, normalize: bool) -> torch.Tensor:
+    """The generated command from command term in the command manager with the given name."""
+    if not normalize:
+        return env.command_manager.get_command(command_name)[..., :max_dim]
+    else:
+        max_ = 5.
+        command = env.command_manager.get_command(command_name)[..., :max_dim]
+        dis = torch.norm(command, dim=-1, keepdim=False)
+        mask = dis > max_
+        if mask.sum() > 0:
+            scale = max_ / dis[mask]
+            command[mask] = scale.reshape(-1, 1) * command[mask]
+        return command

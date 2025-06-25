@@ -20,7 +20,7 @@ def arrive(env: ManagerBasedRLEnv, threshold: float, command_name: str) -> torch
     command = env.command_manager.get_command(command_name)
     des_pos_b = command[:, :2]
     distance = torch.norm(des_pos_b, dim=1)
-    return (distance <= threshold).bool()
+    return ((distance <= threshold).bool() * (env.episode_length_buf >= 10).bool()).bool()
 
 def out_of_region(
     env: ManagerBasedRLEnv, threshold_l: float, threshold_h: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
