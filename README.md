@@ -81,7 +81,7 @@ bash urbansim.sh -a             # Advanced installation including procedural gen
 # Download the required assets
 python scripts/tools/collectors/collect_asset.py
 
-# Convert .glb files to .usd if loading issues occur
+# Convert .glb files to .usd files
 python scripts/tools/converters/convert_asset.py
 ```
 
@@ -135,9 +135,11 @@ You don’t need to install these frameworks separately — all dependencies are
 Can't run URBAN-SIM correctly? Try posting issues or asking the developers and community in our Discussions forum.
 
 ## 📌 TODOs
-- [ ] Release evaluation code with MiniTown assets.
+<!-- - [ ] Release evaluation code with MiniTown assets.
 - [ ] Release pretrained models along with full training configurations.
-- [ ] Release a lightweight procedural generation pipeline.
+- [ ] Release a lightweight procedural generation pipeline. -->
+- [ ] Release terrain generation pipeline.
+- [ ] B2W checkpoints.
 
 ## 💘 Acknowledgement
 The simulator can not be built without the help from Panda3D community and the following open-sourced projects:

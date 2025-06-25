@@ -580,40 +580,88 @@ class UrbanScene(InteractiveScene):
     
     def write_dynamic_asset_state_to_sim(self):
         from isaacsim.core.prims import XFormPrim
-        if not hasattr(self, "ped_step_index"):
-            self.ped_step_index = 0
-            self.ped_direction = 1
-            print(f'[INFO] Pedestrian step index initialized to {self.ped_step_index}: Forward')
-            self.human_prim_expr = XFormPrim(f'/World/envs/env_.*/Dynamic_*')
+        if not hasattr(self, 'pg_pipeline'):
+            self.pg_pipeline = False
+        if self.pg_pipeline:
+            if not hasattr(self, 'human_trajectory'):
+                max_length = np.max([traj.shape[1] for traj in self.interpolated_human_traj])
+                human_traj_list = [torch.cat([traj, torch.zeros([traj.shape[0], max_length - traj.shape[1], 2]).to(traj.device)], dim=1) for traj in self.interpolated_human_traj]
+                self.human_trajectory = torch.stack(human_traj_list).to(self.device)
+                if self.human_trajectory.shape[0] == 1:
+                    self.human_trajectory = self.human_trajectory.repeat(self.num_envs, 1, 1, 1) # N, P, T, 2
+            if self.count % 10 == 0:
+                count = self.count // 10
+                traj = []
+                heading = []
+                for idx in range(self.num_envs):
+                    traj.append(self.human_trajectory[idx, :, count % self.human_trajectory.shape[2], :])
+                    heading.append(torch.arctan2(self.human_trajectory[idx, :, ((count + 1) % self.human_trajectory.shape[2]), 1] - self.human_trajectory[idx, :, count % self.human_trajectory.shape[2], 1], 
+                                                 self.human_trajectory[idx, :, ((count + 1) % self.human_trajectory.shape[2]), 0] - self.human_trajectory[idx, :, count % self.human_trajectory.shape[2], 0]))
+                traj = torch.stack(traj).reshape(len(self._default_env_origins), self.human_trajectory.shape[1], 2)
+                traj = torch.cat([traj, torch.ones_like(traj[..., 0:1]) * 1.30], dim=-1)
+                traj = traj + self._default_env_origins.reshape(len(self._default_env_origins), 1, 3)
+                
+                heading = torch.stack(heading).reshape(-1, self.human_trajectory.shape[1], 1).cpu().numpy().reshape(-1, 1)
+                
+                from scipy.spatial.transform import Rotation as R
+                # +x direction
+                delta_rot = np.pi / 2
+                delta_rotation = R.from_euler('y', delta_rot)
+                default_quat = [0.5, 0.5, 0.5, 0.5] 
+                rotation = R.from_quat(default_quat)
+                # Apply the heading rotation to the current rotation
+                new_rotation =  rotation * delta_rotation
+                new_quat = new_rotation.as_quat()
+                qw, qx, qy, qz = new_quat[3], new_quat[0], new_quat[1], new_quat[2]
+                
+                # apply heading
+                default_quat = np.array([qx, qy, qz, qw])
+                rotation = R.from_quat(default_quat)
+                heading_rots = R.from_euler('y', heading)  # shape: (B,) Rotation object
 
-        if self.count % self.cfg.pg_config.get('ped_forward_inteval', 10) == 0:
-            self.ped_step_index += self.ped_direction
-            moving_max_t = self.cfg.pg_config.get('moving_max_t', 10)
-            if self.ped_step_index >= moving_max_t:
-                self.ped_step_index = moving_max_t
-                self.ped_direction = -1  
-            elif self.ped_step_index <= 0:
+                base_rots = R.from_quat(np.tile(default_quat, (len(heading), 1)))  # shape: (B,4) → Rotation
+
+                combined_rots = base_rots * heading_rots  # shape: (B,)
+
+                quats = combined_rots.as_quat()  # shape: (B, 4)
+                quats_wxyz = quats[:, [3, 0, 1, 2]]
+                self.human_prim_expr = XFormPrim(f'/World/envs/env_*/Dynamic_*')
+                self.human_prim_expr.set_world_poses(positions=traj.reshape(-1, 3),orientations=torch.from_numpy(quats_wxyz).to(self.device).reshape(-1, 4))
+        else:
+            if not hasattr(self, "ped_step_index"):
                 self.ped_step_index = 0
                 self.ped_direction = 1
-            
-            if self.ped_direction == 1:
-                start_xy = [xyzs[0] for xyzs in self.pedestrian_forward_start_end_pos_list]
-                end_xy = [xyzs[1] for xyzs in self.pedestrian_forward_start_end_pos_list]
-                heading = [wxyzs[0] for wxyzs in self.pedestrian_forward_backward_heading_list]
-            elif self.ped_direction == -1:
-                start_xy = [xyzs[0] for xyzs in self.pedestrian_forward_start_end_pos_list]
-                end_xy = [xyzs[1] for xyzs in self.pedestrian_forward_start_end_pos_list]
-                heading = [wxyzs[1] for wxyzs in self.pedestrian_forward_backward_heading_list]
-            start_xy_tensor = torch.tensor(start_xy, device=self.device, dtype=torch.float32).reshape(-1, 3)
-            end_xy_tensor = torch.tensor(end_xy, device=self.device, dtype=torch.float32).reshape(-1, 3)
-            wxyz_tensor = torch.tensor(heading, device=self.device, dtype=torch.float32).reshape(-1, 4)
-            current_xy_tensor = start_xy_tensor + (end_xy_tensor - start_xy_tensor) * (self.ped_step_index / moving_max_t)
-            current_xy_tensor = current_xy_tensor.reshape(self.num_envs, -1, 3) + self._default_env_origins[..., :3].reshape(self.num_envs, 1, 3)
-            current_xy_tensor = current_xy_tensor.reshape(-1, 3)
-            self.human_prim_expr.set_world_poses(
-                positions=current_xy_tensor,
-                orientations=wxyz_tensor,
-            )
+                print(f'[INFO] Pedestrian step index initialized to {self.ped_step_index}: Forward')
+                self.human_prim_expr = XFormPrim(f'/World/envs/env_.*/Dynamic_*')
+
+            if self.count % self.cfg.pg_config.get('ped_forward_inteval', 10) == 0:
+                self.ped_step_index += self.ped_direction
+                moving_max_t = self.cfg.pg_config.get('moving_max_t', 10)
+                if self.ped_step_index >= moving_max_t:
+                    self.ped_step_index = moving_max_t
+                    self.ped_direction = -1  
+                elif self.ped_step_index <= 0:
+                    self.ped_step_index = 0
+                    self.ped_direction = 1
+                
+                if self.ped_direction == 1:
+                    start_xy = [xyzs[0] for xyzs in self.pedestrian_forward_start_end_pos_list]
+                    end_xy = [xyzs[1] for xyzs in self.pedestrian_forward_start_end_pos_list]
+                    heading = [wxyzs[0] for wxyzs in self.pedestrian_forward_backward_heading_list]
+                elif self.ped_direction == -1:
+                    start_xy = [xyzs[0] for xyzs in self.pedestrian_forward_start_end_pos_list]
+                    end_xy = [xyzs[1] for xyzs in self.pedestrian_forward_start_end_pos_list]
+                    heading = [wxyzs[1] for wxyzs in self.pedestrian_forward_backward_heading_list]
+                start_xy_tensor = torch.tensor(start_xy, device=self.device, dtype=torch.float32).reshape(-1, 3)
+                end_xy_tensor = torch.tensor(end_xy, device=self.device, dtype=torch.float32).reshape(-1, 3)
+                wxyz_tensor = torch.tensor(heading, device=self.device, dtype=torch.float32).reshape(-1, 4)
+                current_xy_tensor = start_xy_tensor + (end_xy_tensor - start_xy_tensor) * (self.ped_step_index / moving_max_t)
+                current_xy_tensor = current_xy_tensor.reshape(self.num_envs, -1, 3) + self._default_env_origins[..., :3].reshape(self.num_envs, 1, 3)
+                current_xy_tensor = current_xy_tensor.reshape(-1, 3)
+                self.human_prim_expr.set_world_poses(
+                    positions=current_xy_tensor,
+                    orientations=wxyz_tensor,
+                )
         
         self.count += 1
         
@@ -1737,6 +1785,7 @@ class UrbanScene(InteractiveScene):
         from metaurban.policy.get_planning import get_planning
         if self.cfg.pg_config['type'] == 'dynamic':
             self.use_dynamic_pedestrians = True
+            self.pg_pipeline = True
             print(f'[INFO] use_dynamic_pedestrians->True: Using dynamic pedestrians in the scene.')
             self.dynamic_asset_animatable_state()
             print('[INFO] dynamic asset animatable state is set.')
@@ -1756,6 +1805,7 @@ class UrbanScene(InteractiveScene):
             n[0][..., 0] -=  engine.human_manager.mask_translate[0]
             n[0][..., 1] -=  engine.human_manager.mask_translate[1]
             interpolated_traj = torch.from_numpy(n[0]).permute(1, 0, 2).to(self.device)
+            self.interpolated_human_traj = interpolated_traj.reshape(PG_CONFIG['spawn_human_num'], -1, 2).reshape(1, PG_CONFIG['spawn_human_num'], -1, 2)
             
             # register the Pedestrian dataset cache
             prims_utils.create_prim("/World/DatasetDynamic", "Scope")
@@ -1777,6 +1827,7 @@ class UrbanScene(InteractiveScene):
                         imageable.MakeVisible()
                     else:
                         imageable.MakeInvisible()
+                        
                 # set the semantic annotations
                 if hasattr(proto_asset_config, "semantic_tags") and proto_asset_config.semantic_tags is not None:
                     # note: taken from replicator scripts.utils.utils.py
@@ -1797,82 +1848,39 @@ class UrbanScene(InteractiveScene):
                     sim_utils.activate_contact_sensors(proto_prim_path, proto_asset_config.activate_contact_sensors)
             
             human_prim_path_list = []
-            num_pedestrian = generation_cfg['num_pedestrian']
-            grid_split = int(math.sqrt(num_pedestrian) + 0.5) + 1
-
-            x_bins = np.linspace(0, 1, grid_split)  # [0, 0.25, 0.5, 0.75, 1.0]
-            x_start_left = x_bins[:-1]  # [0, 0.25, 0.5, 0.75]
-            y_bins = np.linspace(0.25, 0.75, grid_split)  # [0, 0.25, 0.5, 0.75, 1.0]
-            y_start_left = y_bins[:-1]  # [0.25, 0.5, 0.75, 1.0]
-            pedestrian_forward_backward_heading_list = []
-            pedestrain_forward_start_end_pos_list = []
+            num_pedestrian = PG_CONFIG['spawn_human_num']
             for env_idx in range(self.num_envs):
                 for human_idx in range(num_pedestrian):
                     prim_path=f"/World/envs/env_{env_idx}/" + f"Dynamic_" + f'{human_idx:04d}'
-                    grid_i = human_idx // (grid_split - 1)
-                    grid_j = human_idx % (grid_split - 1)
-                    grid_i = min(grid_i, len(x_start_left) - 1)
-                    grid_j = min(grid_j, len(y_start_left) - 1)
-                    start_x = x_start_left[grid_i] * area_size[0]
-                    start_y = y_start_left[grid_j] * area_size[1]
-                    
-                    from scipy.spatial.transform import Rotation as R
-                    if np.random.rand() < 0.5:
-                        direction = 'y+'
-                        delta_rot = np.pi
-                    else:
-                        direction = 'x+'
-                        delta_rot = np.pi / 2
-                    delta_rotation = R.from_euler('y', delta_rot)
-                    default_quat = [0.5, 0.5, 0.5, 0.5] 
-                    rotation = R.from_quat(default_quat)
-                    # Apply the heading rotation to the current rotation
-                    new_rotation =  rotation * delta_rotation
-                    new_quat = new_rotation.as_quat()
-                    qw, qx, qy, qz = new_quat[3], new_quat[0], new_quat[1], new_quat[2]
-                    
-                    delta_rotation = R.from_euler('y', delta_rot - np.pi)
-                    # Apply the heading rotation to the current rotation
-                    new_rotation =  rotation * delta_rotation
-                    new_quat = new_rotation.as_quat()
-                    qw_inv, qx_inv, qy_inv, qz_inv = new_quat[3], new_quat[0], new_quat[1], new_quat[2]
-                    pedestrian_forward_backward_heading_list.append(
-                        [
-                            [qw, qx, qy, qz],  # forward heading
-                            [qw_inv, qx_inv, qy_inv, qz_inv]  # backward heading
-                        ]
-                    )
-                    if direction == 'y+':
-                        pedestrain_forward_start_end_pos_list.append(
-                            [
-                                [start_x, start_y, 1.30],  # forward start position
-                                [start_x, start_y + area_size[1] * (y_start_left[1] - y_start_left[0]) * 0.7, 1.30]  # forward end position
-                            ]
-                        )
-                    elif direction == 'x+':
-                        pedestrain_forward_start_end_pos_list.append(
-                            [
-                                [start_x, start_y, 1.30],  # forward start position
-                                [start_x + area_size[0] * (x_start_left[1] - x_start_left[0]) * 0.7, start_y, 1.30]  # forward end position
-                            ]
-                        )
-                    
                     human_prim_path_list.append(
                             [
-                                np.random.choice(dynamic_proto_prim_paths), prim_path, [start_x, start_y, 1.30], (qw, qx, qy, qz)
+                                np.random.choice(dynamic_proto_prim_paths), prim_path, [interpolated_traj.cpu().numpy()[human_idx, 0, 0], interpolated_traj.cpu().numpy()[human_idx, 0, 1], 1.30], (0.0,0.707,0.70,0.0)
                             ]
                         )
+
             all_human_config = RigidObjectCfg(
                 prim_path="/World/envs/env_*/Dynamic_*",
                 spawn=DiversHumanCfg(
                     assets_cfg=human_prim_path_list
                 )
             )
+            
             all_human_config.prim_path = all_human_config.prim_path.format(ENV_REGEX_NS=self.env_regex_ns)
             if hasattr(all_human_config, "collision_group") and all_human_config.collision_group == -1:
                 asset_paths = sim_utils.find_matching_prim_paths(all_human_config.prim_path)
                 self._global_prim_paths += asset_paths
             self._rigid_objects['all_human_config'] = all_human_config.class_type(all_human_config)
+            
+            stage = omni.usd.get_context().get_stage()
+            for env_idx in range(self.num_envs):
+                for human_idx in range(PG_CONFIG['spawn_human_num']):
+                    prim_path=f"/World/envs/env_{env_idx}/" + f"Dynamic_" + f'{human_idx:04d}'
+                    mesh_prim = stage.GetPrimAtPath(prim_path + '/root/pelvis0/Skeleton')
+                    UsdSkel.BindingAPI.Apply(mesh_prim)
+                    mesh_binding_api = UsdSkel.BindingAPI(mesh_prim)
+                    rel =  mesh_binding_api.CreateAnimationSourceRel()
+                    rel.ClearTargets(True)
+                    rel.AddTarget("/World/walk/SMPLX_neutral/root/pelvis0/SMPLX_neutral_Scene")
         
         self.cfg = updated_cfg
         # generate and spawn scene
