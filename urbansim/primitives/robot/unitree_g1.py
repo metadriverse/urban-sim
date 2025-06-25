@@ -200,9 +200,11 @@ def G1NavModifyEnv(env):
     env.scene.camera.prim_path = "{ENV_REGEX_NS}/Robot/head_link/front_cam"
     # env.scene.camera.offset=CameraCfg.OffsetCfg(pos=(0.510, 0.0, 1.3), rot=(0.5, -0.5, 0.5, -0.5), convention="ros")
     # terminations
-    if hasattr(env.terminations, 'collision'):
-        env.terminations.collision.params["sensor_cfg"].body_names = "torso_link"
-        env.terminations.collision.params['threshold'] = 1.0
+    if hasattr(env.terminations, 'base_contact'):
+        env.terminations.base_contact.params["sensor_cfg"].body_names = "torso_link"
+        env.terminations.base_contact.params['threshold'] = 1.0
+    if hasattr(env.rewards, 'contact_penalty'):
+        env.rewards.contact_penalty.params['sensor_cfg'].body_names = ["torso_link"]
     env.events.reset_robot_joints = EventTerm(
         func=mdp.reset_joints_by_scale,
         mode="reset",

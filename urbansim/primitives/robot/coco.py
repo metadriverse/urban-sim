@@ -165,7 +165,7 @@ class ClassicalCarAction(ActionTerm):
             wheel_base = 1.5
             radius_rear = 0.3
             max_ang = 40 * torch.pi / 180
-            velocity = self.raw_actions[..., :1].clamp(-max_wheel_v, max_wheel_v) / radius_rear 
+            velocity = self.raw_actions[..., :1].clamp(0.0, max_wheel_v) / radius_rear 
             angular = self.raw_actions[..., 1:2].clamp(-max_ang, max_ang)
             angular[angular.abs() < 0.05] = torch.zeros_like(angular[angular.abs() < 0.05])
             R = wheel_base / torch.tan(angular)

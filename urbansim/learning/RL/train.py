@@ -16,7 +16,7 @@ import os, sys
 import math
 # launch omniverse
 import argparse
-from omni.isaac.kit import SimulationApp
+# from omni.isaac.kit import SimulationApp
 import builtins
 from collections.abc import Sequence
 from dataclasses import MISSING
@@ -195,7 +195,7 @@ else:
     pg_config = dict(
         type=setting_name, # [clean, static, dynamic]
         with_terrain=False,
-        with_boundary=env_config['Env'].get('with_boundary', True),
+        with_boundary=False,
         map_region=env_config['Env'].get('map_region', 30),
         buffer_width=1,
         num_object=env_config['Env'].get('num_objects', 30),
@@ -258,7 +258,9 @@ else:
         robot_cfg = COCO_CFG
         action_cfg = COCOVelocityActionsCfg
         modify_env_fn = COCONavModifyEnv
-            
+        
+        robot_cfg.init_state.pos = env_config['Robot'].get('init_position', (1.0, 1.0, 0.4))
+    
     elif robot_name.lower() == 'unitree_go2':
         from urbansim.primitives.robot.unitree_go2 import UNITREE_GO2_CFG
         from urbansim.primitives.robot.unitree_go2 import GO2NavActionsCfg
@@ -276,9 +278,24 @@ else:
         robot_cfg = G1_MINIMAL_CFG
         action_cfg = G1NavActionsCfg
         modify_env_fn = G1NavModifyEnv
-        
-    robot_cfg.init_state.pos = env_config['Robot'].get('init_pos', (1.0, 1.0, 0.4))
-        
+
+@configclass
+class ViewerCfg:
+    """Configuration of the scene viewport camera."""
+    eye: tuple[float, float, float] = (-200, -200, 10) 
+
+    lookat: tuple[float, float, float] = (15, 15, 0)
+
+    cam_prim_path: str = "/OmniverseKit_Persp"
+
+    resolution: tuple[int, int] = (1920, 1080)
+
+    origin_type: str = "world"
+
+    env_index: int = 0
+
+    asset_name: str | None = None
+
 # generate env cfg
 @configclass
 class EnvCfg(ManagerBasedRLEnvCfg):
@@ -294,6 +311,7 @@ class EnvCfg(ManagerBasedRLEnvCfg):
                         pg_config=pg_config,
                         scenario_generation_method=env_config['Omniverse'].get('scenario_generation_method', None),)
     # Basic settings
+    viewer = ViewerCfg()
     observations = observation_cfg()
     actions = action_cfg()
     commands = command_cfg()

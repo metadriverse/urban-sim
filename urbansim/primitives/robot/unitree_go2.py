@@ -132,7 +132,7 @@ class GO2NavActionsCfg:
     )
 
 def GO2NavModifyEnv(env):
-    env.terminations.collision.params['sensor_cfg'].body_names = ["base", ".*_thigh"]
+    env.terminations.collision_term_concat.params['sensor_cfg'].body_names = ["base", ".*_thigh"]
     return env
 
 # ============================

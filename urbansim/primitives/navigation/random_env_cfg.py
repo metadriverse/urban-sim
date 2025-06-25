@@ -157,13 +157,15 @@ class SceneCfg(UrbanSceneCfg):
     camera = TiledCameraCfg(
         prim_path="{ENV_REGEX_NS}/Robot/base/front_cam",
         update_period=0.1,
-        height=128,
-        width=128,
-        data_types=['rgb', 'distance_to_image_plane'],
-        spawn=sim_utils.PinholeCameraCfg(
-            focal_length=12.0, focus_distance=400.0, horizontal_aperture=30.0, clipping_range=(0.1, 1.0e5)
+        height=1080 // 8,
+        width=1920 // 8,
+        data_types=['rgb', 'distance_to_camera'],
+        spawn=sim_utils.PinholeCameraCfg.from_intrinsic_matrix(
+            intrinsic_matrix = [531., 0., 960., 0., 531., 540., 0., 0., 1.],
+            width=1920,
+            height=1080,
         ),
-        offset=TiledCameraCfg.OffsetCfg(pos=(0.510, 0.0, 0.015), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
+        offset=CameraCfg.OffsetCfg(pos=(0.51, 0.0, 0.015), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
     )
     # height scanner
     height_scanner = RayCasterCfg(
@@ -198,8 +200,8 @@ class CommandsCfg:
         asset_name="robot",
         simple_heading=False,
         resampling_time_range=(30.0, 30.0),
-        debug_vis=True,
-        ranges=nav_mdp.UniformPose2dCommandCfg.Ranges(pos_x=(7.0, 10.0), pos_y=(7.0, 10.0), heading=(-math.pi, math.pi)),
+        debug_vis=False,
+        ranges=nav_mdp.UniformPose2dCommandCfg.Ranges(pos_x=(15.0, 30.0), pos_y=(15.0, 30.0), heading=(-math.pi, math.pi)),
     )
 
 
@@ -218,11 +220,13 @@ class ObservationsCfg:
     class PolicyCfg(ObsGroup):
         """Observations for policy group."""
         # observation terms (order preserved)
-        pose_command = ObsTerm(func=loc_mdp.generated_commands, params={"command_name": "pose_command"})
+        pose_command = ObsTerm(func=loc_mdp.advanced_generated_commands, params={"command_name": "pose_command", 
+                                                                                 "max_dim": 2,
+                                                                                 "normalize": True})
         
     @configclass
     class SensorCfg(ObsGroup):
-        rgb = ObsTerm(func=nav_mdp.image_processed, params={"sensor_cfg": SceneEntityCfg("camera")})
+        rgb = ObsTerm(func=nav_mdp.rgbd_processed, params={"sensor_cfg": SceneEntityCfg("camera")})
     
     # observation groups
     policy: PolicyCfg = PolicyCfg()
@@ -233,22 +237,49 @@ class EventCfg:
     """Configuration for events."""
 
     # startup
-    pass
+    reset_base = EventTerm(
+        func=loc_mdp.reset_root_state_uniform,
+        mode="reset",
+        params={
+            "pose_range": {"x": (0.3, 0.3), "y": (0.3, 0.3), "yaw": (0.0, 0.0)},
+            "velocity_range": {
+                "x": (-0.0, 0.0),
+                "y": (-0.0, 0.0),
+                "z": (-0.0, 0.0),
+                "roll": (-0.0, 0.0),
+                "pitch": (-0.0, 0.0),
+                "yaw": (-0.0, 0.0),
+            },
+        },
+    )
 
 
 @configclass
 class RewardsCfg:
     """Reward terms for the MDP."""
 
-    termination_penalty = RewTerm(func=loc_mdp.is_terminated, weight=-100.0)
+    arrived_reward = RewTerm(
+        loc_mdp.is_terminated_term, weight=2000.0, params={"term_keys": "arrive"}
+    )
+    # out_of_region_penalty = RewTerm(func=loc_mdp.is_terminated_term, weight=-1.0, params={"term_keys": "out_of_region"})
+    collision_penalty = RewTerm(func=loc_mdp.is_terminated_term, weight=-200.0, params={"term_keys": "collision"})
     position_tracking = RewTerm(
         func=nav_mdp.position_command_error_tanh,
-        weight=1.0,
-        params={"std": 2.0, "command_name": "pose_command"},
+        weight=10.0,
+        params={"std": 5.0, "command_name": "pose_command"},
+    )
+    position_tracking_fine = RewTerm(
+        func=nav_mdp.position_command_error_tanh,
+        weight=50.0,
+        params={"std": 1.0, "command_name": "pose_command"},
     )
     moving_towards_goal = RewTerm(
         func=nav_mdp.moving_towards_goal_reward, 
-        weight=1.0, 
+        weight=20.0, 
+        params={"command_name": "pose_command"})
+    target_vel_rew = RewTerm(
+        func=nav_mdp.target_vel_reward, 
+        weight=10.0, 
         params={"command_name": "pose_command"})
 
 
@@ -256,7 +287,7 @@ class RewardsCfg:
 class TerminationsCfg:
     """Termination terms for the MDP."""
 
-    time_out = DoneTerm(func=loc_mdp.time_out, time_out=False)
+    time_out = DoneTerm(func=loc_mdp.time_out, time_out=True)
     collision = DoneTerm(
         func=nav_mdp.illegal_contact, time_out=False,
         params={
@@ -264,9 +295,38 @@ class TerminationsCfg:
             "threshold": 1.0
             },
     )
+    arrive = DoneTerm(
+        func=nav_mdp.arrive, time_out=False,
+        params={"threshold": 1.0, "command_name": "pose_command"},
+    )
+    # out_of_region = DoneTerm(
+    #     func=nav_mdp.out_of_region, time_out=False,
+    #     params={"threshold_l": -1.0, "threshold_h": 31.0},
+    # )
 
+from isaaclab.envs import ManagerBasedRLEnv
+from collections.abc import Sequence
+map_region = 30.0
+def increase_moving_distance(
+        env:ManagerBasedRLEnv,
+        env_ids:Sequence[int],    # pylint: disable=unused-argument
+        command_name: str = 'pose_command',
+        x_moving_min=(11.0, map_region - 2.),
+        y_moving_min=(5.0, map_region - 2.),
+        total_iterations=10,
+        num_steps_per_iteration=102400):
+    cur_iteration = env.common_step_counter // num_steps_per_iteration
+    start_x, end_x = x_moving_min
+    start_y, end_y = y_moving_min
+    x = start_x + (end_x - start_x) * (cur_iteration / total_iterations)
+
+    x_left = start_x + (end_x - start_x) * (cur_iteration / total_iterations)
+    x_left = min(x_left, end_x)
+    env.command_manager.get_term(command_name).cfg.ranges.pos_x = (10., x_left)
+    env.command_manager.get_term(command_name).cfg.ranges.pos_y = (0., map_region)
 
 @configclass
 class CurriculumCfg:
     """Curriculum terms for the MDP."""
-    pass
+    increased_moving_distance = CurrTerm(func=increase_moving_distance,
+                                         params={})
