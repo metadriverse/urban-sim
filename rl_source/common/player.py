@@ -393,10 +393,14 @@ class BasePlayer(object):
                 first_key = next(keys_iterator)
             obs_shape = self.obs_shape[first_key]
             obses = obses[first_key]
-
-        if len(obses.size()) > len(obs_shape):
-            batch_size = obses.size()[0]
-            self.has_batch_dimension = True
+        try:
+            if len(obses.size()) > len(obs_shape):
+                batch_size = obses.size()[0]
+                self.has_batch_dimension = True
+        except:
+            if len(obses['obs_addons'].size()) > len(obs_shape):
+                batch_size = obses['obs_addons'].size()[0]
+                self.has_batch_dimension = True
 
         self.batch_size = batch_size
 
