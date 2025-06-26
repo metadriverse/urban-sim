@@ -75,7 +75,7 @@ class SceneCfg(UrbanSceneCfg):
     # procedural generation config
     pg_config: dict = dict(
         type='dynamic', # [clean, static, dynamic]
-        with_terrain=True,
+        with_terrain=False,
         with_boundary=True,
         map_region=20,
         buffer_width=1,

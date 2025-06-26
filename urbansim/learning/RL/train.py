@@ -270,6 +270,8 @@ else:
         action_cfg = GO2NavActionsCfg
         modify_env_fn = GO2NavModifyEnv
         
+        robot_cfg.init_state.pos = env_config['Robot'].get('init_position', (1.0, 1.0, 0.3))
+        
     elif robot_name.lower() == 'unitree_g1':
         from urbansim.primitives.robot.unitree_g1 import G1_MINIMAL_CFG
         from urbansim.primitives.robot.unitree_g1 import G1NavActionsCfg
@@ -278,6 +280,8 @@ else:
         robot_cfg = G1_MINIMAL_CFG
         action_cfg = G1NavActionsCfg
         modify_env_fn = G1NavModifyEnv
+        
+        robot_cfg.init_state.pos = env_config['Robot'].get('init_position', (1.0, 1.0, 0.74))
 
 @configclass
 class ViewerCfg:

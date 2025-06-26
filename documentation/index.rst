@@ -47,101 +47,29 @@ Table of Contents
 
 .. toctree::
    :maxdepth: 2
-   :caption: Isaac Lab
+   :caption: Getting Started with URBAN-SIM
 
-   source/setup/ecosystem
    source/setup/installation/index
-   source/setup/installation/cloud_installation
-   source/refs/reference_architecture/index
-
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Getting Started
-   :titlesonly:
-
    source/setup/quickstart
-   source/setup/walkthrough/index
-   source/tutorials/index
-   source/how-to/index
-   source/overview/developer-guide/index
-
 
 .. toctree::
    :maxdepth: 3
-   :caption: Overview
+   :caption: RL Training with URBAN-SIM
    :titlesonly:
-
-
-   source/overview/core-concepts/index
+   
+   source/overview/simulation
    source/overview/environments
+   source/overview/configuration
    source/overview/reinforcement-learning/index
-   source/overview/teleop_imitation
-   source/overview/showroom
-   source/overview/simple_agents
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Features
-
-   source/features/hydra
-   source/features/multi_gpu
-   Tiled Rendering</source/overview/core-concepts/sensors/camera>
-   source/features/ray
-   source/features/reproducibility
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Resources
-   :titlesonly:
-
-   source/deployment/index
-   source/policy_deployment/index
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Migration Guides
-   :titlesonly:
-
-   source/migration/migrating_from_isaacgymenvs
-   source/migration/migrating_from_omniisaacgymenvs
-   source/migration/migrating_from_orbit
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Source API
-
-   source/api/index
 
 .. toctree::
    :maxdepth: 1
    :caption: References
 
-
-   source/refs/additional_resources
-   source/refs/contributing
-   source/refs/troubleshooting
-   source/refs/migration
+   source/refs/assets
    source/refs/issues
-   source/refs/release_notes
-   source/refs/changelog
    source/refs/license
-   source/refs/bibliography
-
-.. toctree::
-    :hidden:
-    :caption: Project Links
-
-    GitHub <https://github.com/isaac-sim/IsaacLab>
-    NVIDIA Isaac Sim <https://docs.isaacsim.omniverse.nvidia.com/latest/index.html>
-    NVIDIA PhysX <https://nvidia-omniverse.github.io/PhysX/physx/5.4.1/index.html>
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+   source/refs/3license
 
 .. _NVIDIA Isaac Sim: https://docs.isaacsim.omniverse.nvidia.com/latest/index.html
 .. _NVIDIA Isaac Lab: https://isaac-sim.github.io/IsaacLab/main/index.html

@@ -33,11 +33,14 @@ sys.path.insert(0, os.path.abspath("../isaac_source/isaaclab_mimic"))
 sys.path.insert(0, os.path.abspath("../isaac_source/isaaclab_mimic/isaaclab_mimic"))
 sys.path.insert(0, os.path.abspath("../isaac_source/isaaclab_assets"))
 sys.path.insert(0, os.path.abspath("../isaac_source/isaaclab_assets/isaaclab_assets"))
+sys.path.insert(0, os.path.abspath("../urbansim"))
+sys.path.insert(0, os.path.abspath("../meta_source/metaurban/metaurban"))
+sys.path.insert(0, os.path.abspath("../meta_source/metadrive/metadrive"))
 
 # -- Project information -----------------------------------------------------
 
 project = "URBAN-SIM"
-copyright = "2025-2030, The URBAN-SIM Project Developers."
+copyright = "2025-2030, The URBAN-SIM Project Developers. " + "[URBAN-SIM is built upon NVIDIA Isaac Sim&Lab and extends its capabilities for urban robot learning tasks]"
 author = "Honglin He"
 
 # Read version from the package
@@ -122,6 +125,7 @@ intersphinx_mapping = {
     "gymnasium": ("https://gymnasium.farama.org/", None),
     "warp": ("https://nvidia.github.io/warp/", None),
     "isaaclab": ("https://isaac-sim.github.io/IsaacLab/main/index.html", None),
+    "metaurban": ("https://metadriverse.github.io/metaurban/", None),
 }
 
 # Add any paths that contain templates here, relative to this directory.
@@ -267,7 +271,7 @@ html_theme_options = {
         {
             "name": "Isaac Lab",
             "url": "https://github.com/isaac-sim/IsaacLab",
-            "icon": "https://img.shields.io/badge/IsaacLab-silver.svg",
+            "icon": "https://img.shields.io/badge/IsaacLab-2.0.1-silver.svg",
             "type": "url",
         },
         {

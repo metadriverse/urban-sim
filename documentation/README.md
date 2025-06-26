@@ -17,7 +17,7 @@ cd docs
 pip install -r requirements.txt
 
 # 2. Build the current documentation
-make current-docs
+rm -rf _build && make current-docs
 
 # 3. Open the current docs
 xdg-open _build/current/index.html
