@@ -129,17 +129,26 @@ We adopt different training backends tailored to specific tasks:
 
 You don’t need to install these frameworks separately — all dependencies are installed via ```urbansim.sh```.
 
+### Play with pretrained policy
+You can play with the pretrained policy in environments, for example,
+```bash
+python urbansim/learning/RL/play.py --env configs/env_configs/navigation/coco.yaml --enable_cameras --num_envs 1 --checkpoint ./assets/ckpts/navigation/coco_static.pth
+```
+
+This will launch a single environment with camera views enabled, using a pretrained navigation policy in a static urban scene.
+
+We plan to support more pretrained checkpoints and diverse environments in upcoming releases. Please stay tuned !
 
 ## 📖 Questions and Support
 
-Can't run URBAN-SIM correctly? Try posting issues or asking the developers and community in our Discussions forum.
+Can't run URBAN-SIM correctly? Please refer to: [FAQs](documentation/faq.md). 
+
+Can't find the answer to your question? Try posting issues or asking the developers and community in our Discussions forum.
 
 ## 📌 TODOs
-<!-- - [ ] Release evaluation code with MiniTown assets.
-- [ ] Release pretrained models along with full training configurations.
-- [ ] Release a lightweight procedural generation pipeline. -->
 - [ ] Release terrain generation pipeline.
-- [ ] B2W checkpoints.
+- [ ] Release checkpoints for more robots (Booster T1, Unitree G1, ...).
+- [ ] Release useful scripts for downstream tasks such as data generation for imitation learning, instance and appearance randomization, ...
 
 ## 💘 Acknowledgement
 The simulator can not be built without the help from Panda3D community and the following open-sourced projects:

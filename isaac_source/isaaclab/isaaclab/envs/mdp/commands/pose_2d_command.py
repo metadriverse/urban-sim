@@ -152,7 +152,7 @@ class UniformPose2dCommand(CommandTerm):
     def _debug_vis_callback(self, event):
         # update the box marker
         self.goal_pose_visualizer.visualize(
-            translations=self.pos_command_w,
+            translations=torch.cat([self.pos_command_w[:, :2], torch.ones_like(self.pos_command_w[:, 2:3]) * 2.5], dim=1),
             orientations=quat_from_euler_xyz(
                 torch.zeros_like(self.heading_command_w),
                 torch.zeros_like(self.heading_command_w),
