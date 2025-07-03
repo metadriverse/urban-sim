@@ -124,7 +124,7 @@ def main():
     file_names_parent = [os.path.join(root_dir, f) for f in valid_files]
 
     file_names = [f for f in file_names_parent if '.glb' in f] 
-    file_goes = [f.replace('glb', 'usd').replace('asssets/objects', 'asssets/usds') for f in file_names]
+    file_goes = [f.replace('glb', 'usd').replace('assets/objects', 'assets/usds') for f in file_names]
     
     if args_cli.mass is not None:
         mass_props = schemas_cfg.MassPropertiesCfg(mass=args_cli.mass)
