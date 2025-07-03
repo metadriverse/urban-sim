@@ -147,7 +147,7 @@ Can't find the answer to your question? Try posting issues or asking the develop
 
 ## 📌 TODOs
 - [ ] Release terrain generation pipeline.
-- [ ] Release checkpoints for more robots (Booster T1, Unitree G1, ...).
+- [ ] Release checkpoints for more robots (Booster T1, Unitree G1, ...)
 - [ ] Release useful scripts for downstream tasks such as data generation for imitation learning, instance and appearance randomization, ...
 
 ## 💘 Acknowledgement
