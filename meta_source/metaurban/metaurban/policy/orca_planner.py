@@ -5,7 +5,7 @@ from metaurban.engine.logger import get_logger
 
 import sys
 # sys.path.insert(0, 'orca_algo/build')
-sys.path.append(0, "meta_source/metaurban/metaurban/orca_algo/build")
+sys.path.insert(0, "meta_source/metaurban/metaurban/orca_algo/build")
 
 
 import bind
