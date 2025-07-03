@@ -1,0 +1,1 @@
+/usr/bin/c++  -fPIC -std=c++14 -w -O0 -O3 -DNDEBUG CMakeFiles/xmltest.dir/xmltest.cpp.o -o xmltest  libtinyxml2.a

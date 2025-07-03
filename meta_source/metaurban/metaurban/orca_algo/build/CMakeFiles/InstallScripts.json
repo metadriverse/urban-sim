@@ -1,0 +1,9 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/hollis/projects/URBAN-SIM-Private/meta_source/metaurban/metaurban/orca_algo/build/cmake_install.cmake",
+		"/home/hollis/projects/URBAN-SIM-Private/meta_source/metaurban/metaurban/orca_algo/build/pybind11/cmake_install.cmake",
+		"/home/hollis/projects/URBAN-SIM-Private/meta_source/metaurban/metaurban/orca_algo/build/external/tinyxml2/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
