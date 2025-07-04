@@ -63,6 +63,12 @@ Table of Contents
    source/overview/reinforcement-learning/index
 
 .. toctree::
+   :maxdepth: 3
+   :caption: Developer
+
+   source/developer/code-structure/index
+
+.. toctree::
    :maxdepth: 1
    :caption: References
 

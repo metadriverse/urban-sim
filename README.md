@@ -13,6 +13,8 @@
 [
 <a href="https://metadriverse.github.io/urban-sim/">Website</a>
 |
+<a href="https://metadriverse.github.io/urban-sim/">Documentation</a>
+|
 <a href="https://arxiv.org/pdf/2505.00690.pdf">Paper</a>
 |
 <a href="https://metadriverse.github.io/">Relevant Projects</a>
