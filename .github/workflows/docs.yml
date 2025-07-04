@@ -42,16 +42,16 @@ jobs:
         architecture: x64
 
     - name: Install dev requirements
-      working-directory: ./docs
+      working-directory: ./documentation
       run: pip install -r requirements.txt
 
     - name: Check branch docs building
-      working-directory: ./docs
+      working-directory: ./documentation
       if: needs.check-secrets.outputs.trigger-deploy != 'true'
       run: make current-docs
 
     - name: Generate multi-version docs
-      working-directory: ./docs
+      working-directory: ./documentation
       run: |
         git fetch --prune --unshallow --tags
         make multi-docs
