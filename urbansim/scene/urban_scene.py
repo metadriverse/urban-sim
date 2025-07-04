@@ -1075,7 +1075,7 @@ class UrbanScene(InteractiveScene):
                     start_y = y_start_left[grid_j] * area_size[1]
                     
                     from scipy.spatial.transform import Rotation as R
-                    if np.random.rand() < 0.5:
+                    if human_idx % 2 == 0:
                         direction = 'y+'
                         delta_rot = np.pi
                     else:
