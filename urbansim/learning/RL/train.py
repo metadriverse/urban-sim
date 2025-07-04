@@ -29,6 +29,7 @@ parser = argparse.ArgumentParser("Welcome to URBAN-SIM Environments!")
 parser.add_argument("--env", type=str, default=None, help="Configuration file for the environment.")
 parser.add_argument("--framework", type=str, default='rlgames', choices=['rlgames', 'rsl'], help="Learning framework. Recommended to use [rsl] for locomotion and [rlgames] for navigation.")
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to spawn.")
+parser.add_argument("--mini", action="store_true", default=False, help="Whether to run a mini version of the environment for debugging purposes.")
 parser.add_argument("--trace_model", action="store_true", default=False, help="Trace the model and save it as a TorchScript model.")
 parser.add_argument(
     "--color_scheme",
@@ -286,7 +287,10 @@ else:
 @configclass
 class ViewerCfg:
     """Configuration of the scene viewport camera."""
-    eye: tuple[float, float, float] = (-200, -200, 10) 
+    if args_cli.mini:
+        eye: tuple[float, float, float] = (-10, -10, 10)
+    else:
+        eye: tuple[float, float, float] = (-200, -200, 10) 
 
     lookat: tuple[float, float, float] = (15, 15, 0)
 
@@ -362,16 +366,29 @@ class EnvCfg(ManagerBasedRLEnvCfg):
   
 # register env
 import gymnasium as gym
-gym.register(
-    id=f"URBANSIM-{task_name}-{robot_name}-{setting_name}",
-    entry_point="urbansim.envs:AbstractRLEnv",
-    disable_env_checker=True,
-    kwargs={
-        "env_cfg_entry_point": EnvCfg,
-        "rsl_rl_cfg_entry_point":  f"urbansim.primitives.robot.{robot_name}:PPORunnerCfg",
-        "rl_games_cfg_entry_point": f"configs/rl_configs/{task_name}/{robot_name}/{setting_name}_train.yaml",
-    },
-)
+if args_cli.mini:
+    print('[INFO] Running mini version of the environment.')
+    gym.register(
+        id=f"URBANSIM-{task_name}-{robot_name}-{setting_name}",
+        entry_point="urbansim.envs:AbstractRLEnv",
+        disable_env_checker=True,
+        kwargs={
+            "env_cfg_entry_point": EnvCfg,
+            "rsl_rl_cfg_entry_point":  f"urbansim.primitives.robot.{robot_name}:PPORunnerCfg",
+            "rl_games_cfg_entry_point": f"configs/rl_configs/{task_name}/{robot_name}/{setting_name}_train_mini.yaml",
+        },
+    )
+else:
+    gym.register(
+        id=f"URBANSIM-{task_name}-{robot_name}-{setting_name}",
+        entry_point="urbansim.envs:AbstractRLEnv",
+        disable_env_checker=True,
+        kwargs={
+            "env_cfg_entry_point": EnvCfg,
+            "rsl_rl_cfg_entry_point":  f"urbansim.primitives.robot.{robot_name}:PPORunnerCfg",
+            "rl_games_cfg_entry_point": f"configs/rl_configs/{task_name}/{robot_name}/{setting_name}_train.yaml",
+        },
+    )
 args_cli.task = f"URBANSIM-{task_name}-{robot_name}-{setting_name}"
 
 # RL framework
