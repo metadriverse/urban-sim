@@ -21,7 +21,7 @@
 </div>
 
 ## Latest Updates
-- [Jun/15/2025] **v0.0.1**: The first official release of URBAN-SIM.
+- [Jul/05/2025] **v0.0.1**: The first official release of URBAN-SIM.
 
 ## Table of Contents
 - [URBANSIM](#-towards-autonomous-micromobility-through-scalable-urban-simulation)
@@ -115,9 +115,14 @@ More details, comparisons, and target results can be found in:
 ## 🚀 Reinforcement Learning
 We train policies by specifying configuration files, which define environment settings, algorithm parameters, and training options. For example,
 
+### Training
+#### Training with Large-Memory GPUs (> 20 GB VRAM)
+
 ```bash
 python urbansim/learning/RL/train.py --env configs/env_configs/navigation/coco.yaml --enable_cameras
 ```
+
+This script is designed for `large-scale` experiments using powerful GPUs. The provided configuration and default parameters are designed to ensure stable and reproducible training results across diverse scenarios.
 
 For PPO training, you can change the parameters in the configuration files to adjust learning rate, number of steps, entropy regularization, and other hyperparameters.
 
@@ -128,6 +133,14 @@ We adopt different training backends tailored to specific tasks:
 - `Navigation` is trained with the rl-games framework, which supports training with flexible network architectures.
 
 You don’t need to install these frameworks separately — all dependencies are installed via ```urbansim.sh```.
+
+#### Training with limited environments on a local machine
+
+```bash
+python urbansim/learning/RL/train.py --env configs/env_configs/navigation/coco_mini.yaml --enable_cameras --mini
+```
+
+This script is provided for debugging on a local machine. To obtain a robust policy, we highly recommend training with larger-scale environments as described above.
 
 ### Play with pretrained policy
 You can play with the pretrained policy in environments, for example,
@@ -146,9 +159,10 @@ Can't run URBAN-SIM correctly? Please refer to: [FAQs](documentation/faq.md).
 Can't find the answer to your question? Try posting issues or asking the developers and community in our Discussions forum.
 
 ## 📌 TODOs
-- [ ] Release terrain generation pipeline.
+- [ ] Curated asset and scenarios for better rendering.
 - [ ] Release checkpoints for more robots (Booster T1, Unitree G1, ...)
-- [ ] Release useful scripts for downstream tasks such as data generation for imitation learning, instance and appearance randomization, ...
+- [ ] Release useful scripts for downstream tasks such as data generation for imitation learning, instance/appearance randomization for reinforcement learning.
+- [ ] Lightweight pipeline for scenario & environment generation.
 
 ## 💘 Acknowledgement
 The simulator can not be built without the help from Panda3D community and the following open-sourced projects:
