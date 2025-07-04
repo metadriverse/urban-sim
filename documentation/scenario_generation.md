@@ -55,17 +55,21 @@ The PG pipeline generates structured environments using rule-based or programmat
 ```bash
 python urbansim/envs/separate_envs/random_env.py --enable_cameras --num_envs 16 --use_async
 ```
+
+<div align="center">
+  <div style="display: inline-block; text-align: center; margin: 0 1%">
+    <img src="./assets/random_detail.png" width="100%"><br>
+    <p>Random Placement</p>
+  </div>
+</div>
+
 ### 2. Procedural  Generation
 ```bash
 python urbansim/envs/separate_envs/pg_env.py --enable_cameras --num_envs 16 --use_async
 ```
 <div align="center">
   <div style="display: inline-block; text-align: center; margin: 0 1%">
-    <img src="./assets/random_detail.png" width="45%"><br>
-    <p>Random Placement</p>
-  </div>
-  <div style="display: inline-block; text-align: center; margin: 0 1%">
-    <img src="./assets/pg_detail.png" width="45%"><br>
+    <img src="./assets/pg_detail.png" width="100%"><br>
     <p>Procedural Generation</p>
   </div>
 </div>

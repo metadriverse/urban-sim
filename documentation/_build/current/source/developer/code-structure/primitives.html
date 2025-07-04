@@ -1,0 +1,764 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+    <title>Primitives Module &#8212; URBAN-SIM Documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" href="../../../_static/styles/sphinx-book-theme.css?digest=14f4ca6b54d191a8c7657f6c759bf11a5fb86285" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="/home/hollis/anaconda3/envs/urbansim/lib/python3.10/site-packages/sphinxcontrib/icon/node_modules/@fortawesome/fontawesome-free/css/all.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/custom.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinx-design.4cbf315f70debaebd550c87a6162cf0f.min.css" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/sphinx_highlight.js"></script>
+    <script src="/home/hollis/anaconda3/envs/urbansim/lib/python3.10/site-packages/sphinxcontrib/icon/node_modules/@fortawesome/fontawesome-free/js/all.min.js"></script>
+    <script src="../../../_static/clipboard.min.js"></script>
+    <script src="../../../_static/copybutton.js"></script>
+    <script src="../../../_static/scripts/sphinx-book-theme.js?digest=5a5c038af52cf7bc1a1ec88eea08e6366ee68824"></script>
+    <script src="../../../_static/design-tabs.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'source/developer/code-structure/primitives';</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="UrbanScene: Scenario Construction" href="scene.html" />
+    <link rel="prev" title="Learning Module" href="learning.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="0.0.1" />
+    <meta name="docbuild:last-update" content="Jul 04, 2025"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">URBAN-SIM Documentation</p>
+  
+</a></div>
+        <div class="sidebar-primary-item"><ul class="navbar-icon-links"
+    aria-label="Quick Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/metadriverse/urban-sim" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://img.shields.io/github/stars/metadriverse/urban-sim?color=fedcba" title="Stars" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><img src="https://img.shields.io/github/stars/metadriverse/urban-sim?color=fedcba" class="icon-link-image" alt="Stars"/></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/isaac-sim/IsaacLab" title="Isaac Lab" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><img src="https://img.shields.io/badge/IsaacLab-2.0.1-silver.svg" class="icon-link-image" alt="Isaac Lab"/></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://developer.nvidia.com/isaac-sim" title="Isaac Sim" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><img src="https://img.shields.io/badge/IsaacSim-4.5.0-silver.svg" class="icon-link-image" alt="Isaac Sim"/></a>
+        </li>
+</ul></div>
+        <div class="sidebar-primary-item">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+        <div class="sidebar-primary-item"><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started with URBAN-SIM</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../setup/installation/index.html">Local Installation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../setup/installation/binaries_installation.html">Binary installation (recommended)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../setup/installation/asset_caching.html">Asset caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../setup/installation/verifying_installation.html">Verifying the installation</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../setup/quickstart.html">Quickstart Guide</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">RL Training with URBAN-SIM</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../overview/simulation.html">Simulation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/environments.html">Environments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/configuration.html">Environment Configurations</a></li>
+
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../overview/reinforcement-learning/index.html">Reinforcement Learning in URBAN-SIM</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../overview/reinforcement-learning/scene.html">Scene Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../overview/reinforcement-learning/action.html">Action Space</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../overview/reinforcement-learning/observation.html">Observation Space</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../overview/reinforcement-learning/reward.html">Reward</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../overview/reinforcement-learning/reset.html">Termination Conditions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../overview/reinforcement-learning/curriculum.html">Curriculum Learning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../overview/reinforcement-learning/event.html">Events</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Developer</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Code Structure in URBAN-SIM</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="envs.html">Environment: Spawning and simulation for learning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="learning.html">Learning Module</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Primitives Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="scene.html">UrbanScene: Scenario Construction</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">References</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../refs/assets.html">Assets in URBAN-SIM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../refs/issues.html">Known Issues and Limitations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../refs/license.html">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../refs/3license.html">Third-Party License Notice</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><label class="sidebar-toggle primary-toggle btn btn-sm" for="__primary" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</label></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/metadriverse/urban-sim" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/metadriverse/urban-sim/edit/main/source/developer/code-structure/primitives.rst" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/metadriverse/urban-sim/issues/new?title=Issue%20on%20page%20%2Fsource/developer/code-structure/primitives.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../../_sources/source/developer/code-structure/primitives.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button>
+
+
+<button class="btn btn-sm pst-navbar-icon search-button search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+</button>
+<label class="sidebar-toggle secondary-toggle btn btn-sm" for="__secondary"title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</label>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Primitives Module</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#navigation-random-env-cfg-py">Navigation: random_env_cfg.py</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#scene-configuration-scenecfg">Scene Configuration (SceneCfg)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#mdp-components">MDP Components</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#integration">Integration</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#takeaway">Takeaway</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#robot">Robot</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#robot-configuration">Robot Configuration</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#action-space-1-velocity-angular-commands">Action Space 1: Velocity + Angular Commands</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#action-space-2-waypoint-based-commands">Action Space 2: Waypoint-based Commands</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#integration-hook">Integration Hook</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id1">Takeaway</a></li>
+</ul>
+</li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="primitives-module">
+<h1>Primitives Module<a class="headerlink" href="#primitives-module" title="Permalink to this heading">#</a></h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">urbansim.primitives</span></code> package contains the foundational configuration scripts used to build training environments for both <strong>navigation</strong> and <strong>locomotion</strong> tasks. It is divided into three main submodules:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">navigation</span></code>: configuration and MDP logic for point-to-point navigation environments.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">locomotion</span></code>: terrain-based locomotion tasks for legged robots.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">robot</span></code>: robot-specific configuration files (URDF paths, controllers, action spaces, etc.).</p></li>
+</ul>
+<p>While <code class="docutils literal notranslate"><span class="pre">locomotion</span></code> follows a similar configuration pattern, we focus on <code class="docutils literal notranslate"><span class="pre">navigation</span></code> in this section to illustrate how procedural generation and task logic are composed.</p>
+<section id="navigation-random-env-cfg-py">
+<h2>Navigation: random_env_cfg.py<a class="headerlink" href="#navigation-random-env-cfg-py" title="Permalink to this heading">#</a></h2>
+<p>We take <code class="docutils literal notranslate"><span class="pre">random_env_cfg.py</span></code> under <code class="docutils literal notranslate"><span class="pre">urbansim.primitives.navigation</span></code> as the primary example to explain the primitives module. This file defines the full environment configuration for random, procedurally generated navigation scenarios.</p>
+<section id="scene-configuration-scenecfg">
+<h3>Scene Configuration (SceneCfg)<a class="headerlink" href="#scene-configuration-scenecfg" title="Permalink to this heading">#</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">SceneCfg</span></code> class extends <code class="docutils literal notranslate"><span class="pre">UrbanSceneCfg</span></code> and defines the simulation environment, including:</p>
+<ul class="simple">
+<li><p><strong>Procedural Generation (pg_config)</strong>: This dictionary controls scenario diversity — including the number of obstacles, pedestrians, environment size, and boundary setup.</p></li>
+<li><p><strong>Terrain Importing</strong>: Includes default ground, obstacle terrains, walkable and non-walkable tiles. Each region is assigned random visual materials to simulate diverse textures.</p></li>
+<li><p><strong>Lighting</strong>: A random HDR dome light is chosen at runtime from a curated list.</p></li>
+<li><p><strong>Sensors</strong>:
+- <em>RGB-D Camera</em>: Positioned on the robot base, provides <cite>rgb</cite> and <cite>distance_to_camera</cite> for learning or logging.
+- <em>Height Scanner</em>: Ray-based terrain scanner mounted above the robot, useful for terrain-aware policies.
+- <em>Contact Sensors</em>: Detects collisions for reward and termination purposes.</p></li>
+</ul>
+</section>
+<section id="mdp-components">
+<h3>MDP Components<a class="headerlink" href="#mdp-components" title="Permalink to this heading">#</a></h3>
+<p>The random navigation environment is designed around modular MDP configuration classes:</p>
+<ul class="simple">
+<li><p><strong>CommandsCfg</strong>: Defines goal pose sampling in a bounded region using <cite>UniformPose2dCommandCfg</cite>.</p></li>
+<li><p><strong>ObservationsCfg</strong>:
+- <cite>policy</cite>: Receives normalized pose commands.
+- <cite>sensor</cite>: Receives processed RGB image from the front camera.</p></li>
+<li><p><strong>ActionsCfg</strong>: Empty placeholder, to be overridden by robot-specific action spaces.</p></li>
+<li><p><strong>RewardsCfg</strong>:
+- <cite>arrived_reward</cite>: High reward for reaching the goal.
+- <cite>position_tracking</cite>: Encourages trajectory following.
+- <cite>collision_penalty</cite>: Strong penalty for contact.
+- <cite>moving_towards_goal</cite>, <cite>target_vel_rew</cite>: Additional shaping terms.</p></li>
+<li><p><strong>TerminationsCfg</strong>:
+- <cite>collision</cite>: Checks illegal contact via contact sensor.
+- <cite>arrive</cite>: Stops when the robot is close enough to the goal.
+- <cite>time_out</cite>: Ends episodes after a max step count.</p></li>
+<li><p><strong>EventCfg</strong>: Defines how to reset the robot’s base pose and velocity on episode start.</p></li>
+<li><p><strong>CurriculumCfg</strong>: Implements curriculum learning, such as <cite>increase_moving_distance</cite>, which gradually expands the goal sampling region to increase difficulty.</p></li>
+</ul>
+</section>
+<section id="integration">
+<h3>Integration<a class="headerlink" href="#integration" title="Permalink to this heading">#</a></h3>
+<p>The <cite>random_env_cfg.py</cite> is used in <cite>train.py</cite> for training setup, and is registered into Gym via:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">gym</span><span class="o">.</span><span class="n">register</span><span class="p">(</span>
+    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;URBANSIM-navigation-coco-dynamic&quot;</span><span class="p">,</span>
+    <span class="n">entry_point</span><span class="o">=</span><span class="s2">&quot;urbansim.envs:AbstractRLEnv&quot;</span><span class="p">,</span>
+    <span class="n">kwargs</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;env_cfg_entry_point&quot;</span><span class="p">:</span> <span class="n">EnvCfg</span><span class="p">,</span>
+        <span class="o">...</span>
+    <span class="p">},</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>This enables training in both RSL-RL and RL-Games pipelines, with full compatibility for curriculum, procedural variation, and video recording.</p>
+</section>
+<section id="takeaway">
+<h3>Takeaway<a class="headerlink" href="#takeaway" title="Permalink to this heading">#</a></h3>
+<p>The primitives module enables decoupling between robot specifications, task design, and simulation setup. By combining different configurations (e.g., new robot + random terrain + new reward), users can flexibly prototype new scenarios with minimal code duplication.</p>
+</section>
+</section>
+<section id="robot">
+<h2>Robot<a class="headerlink" href="#robot" title="Permalink to this heading">#</a></h2>
+<p>We take the <code class="docutils literal notranslate"><span class="pre">coco.py</span></code> file under <code class="docutils literal notranslate"><span class="pre">urbansim.primitives.robot</span></code> as an example to demonstrate how a robot is defined and integrated into the simulation.</p>
+<p>The COCO robot is a four-wheel steerable vehicle with a front axle joint and delayed PD control. It supports <strong>two types of action spaces</strong>:</p>
+<ol class="arabic simple">
+<li><p><strong>Velocity-based commands</strong> (linear velocity + angular steering)</p></li>
+<li><p><strong>Waypoint-based commands</strong> (local Cartesian goal points)</p></li>
+</ol>
+<section id="robot-configuration">
+<h3>Robot Configuration<a class="headerlink" href="#robot-configuration" title="Permalink to this heading">#</a></h3>
+<p>The robot is instantiated with an <code class="docutils literal notranslate"><span class="pre">ArticulationCfg</span></code> class, specifying:</p>
+<ul class="simple">
+<li><p><strong>URDF (USD) Path</strong>: Under <code class="docutils literal notranslate"><span class="pre">assets/robots/coco_one/coco_one.usd</span></code></p></li>
+<li><p><strong>Initial State</strong>: Position + joint position/velocity initialization</p></li>
+<li><p><strong>Actuators</strong>:
+- <em>Wheels</em>: PD-velocity control with optional actuation delay
+- <em>Front axle</em>: DC motor controlling the steering angle
+- <em>Shocks</em>: Passive (zero stiffness/damping) implicit actuator</p></li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">COCO_CFG</span> <span class="o">=</span> <span class="n">ArticulationCfg</span><span class="p">(</span>
+    <span class="n">spawn</span><span class="o">=</span><span class="n">sim_utils</span><span class="o">.</span><span class="n">UsdFileCfg</span><span class="p">(</span><span class="n">usd_path</span><span class="o">=</span><span class="s2">&quot;assets/robots/coco_one/coco_one.usd&quot;</span><span class="p">,</span> <span class="o">...</span><span class="p">),</span>
+    <span class="n">init_state</span><span class="o">=</span><span class="n">ArticulationCfg</span><span class="o">.</span><span class="n">InitialStateCfg</span><span class="p">(</span><span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">),</span> <span class="o">...</span><span class="p">),</span>
+    <span class="n">actuators</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;wheels&quot;</span><span class="p">:</span> <span class="n">DelayedPDActuatorCfg</span><span class="p">(</span><span class="o">...</span><span class="p">),</span>
+        <span class="s2">&quot;axle&quot;</span><span class="p">:</span> <span class="n">DCMotorCfg</span><span class="p">(</span><span class="o">...</span><span class="p">),</span>
+        <span class="s2">&quot;shock&quot;</span><span class="p">:</span> <span class="n">ImplicitActuatorCfg</span><span class="p">(</span><span class="o">...</span><span class="p">),</span>
+    <span class="p">},</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="action-space-1-velocity-angular-commands">
+<h3>Action Space 1: Velocity + Angular Commands<a class="headerlink" href="#action-space-1-velocity-angular-commands" title="Permalink to this heading">#</a></h3>
+<p>The <cite>ClassicalCarAction</cite> class defines how a <cite>(v, ω)</cite> command is transformed into wheel velocity and steering angle.</p>
+<ul class="simple">
+<li><p>Steering is calculated via Ackermann geometry (wheelbase, turning radius).</p></li>
+<li><p>Acceleration is applied to all 4 wheels.</p></li>
+<li><p>Actions are updated every <code class="docutils literal notranslate"><span class="pre">ACTION_INTERVAL</span></code> steps to emulate delayed control.</p></li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">ClassicalCarAction</span><span class="p">(</span><span class="n">ActionTerm</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">apply_actions</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">velocity</span> <span class="o">=</span> <span class="o">...</span>
+        <span class="n">angular</span> <span class="o">=</span> <span class="o">...</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">steering_action</span><span class="o">.</span><span class="n">process_actions</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">acceleration_action</span><span class="o">.</span><span class="n">process_actions</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Config class: <code class="docutils literal notranslate"><span class="pre">ClassicalCarActionCfg</span></code></p></li>
+<li><p>MDP entry point: <code class="docutils literal notranslate"><span class="pre">COCOVelocityActionsCfg</span></code></p></li>
+</ul>
+</section>
+<section id="action-space-2-waypoint-based-commands">
+<h3>Action Space 2: Waypoint-based Commands<a class="headerlink" href="#action-space-2-waypoint-based-commands" title="Permalink to this heading">#</a></h3>
+<p>The <cite>ClassicalCarWaypointAction</cite> transforms a local 2D waypoint into velocity and steering commands using a PD controller.</p>
+<ul class="simple">
+<li><p><cite>(dx, dy)</cite> is interpreted as a short-range goal in the robot’s frame.</p></li>
+<li><p>PD controller infers velocity and desired yaw rate, then translates that into steering angle.</p></li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">ClassicalCarWaypointAction</span><span class="p">(</span><span class="n">ActionTerm</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">process_actions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">actions</span><span class="p">):</span>
+        <span class="n">v</span><span class="p">,</span> <span class="n">w</span> <span class="o">=</span> <span class="n">pd_controller</span><span class="p">(</span><span class="n">actions</span><span class="p">)</span>
+        <span class="o">...</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">steering_action</span><span class="o">.</span><span class="n">process_actions</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">acceleration_action</span><span class="o">.</span><span class="n">process_actions</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Config class: <code class="docutils literal notranslate"><span class="pre">ClassicalCarWaypointActionCfg</span></code></p></li>
+<li><p>MDP entry point: <code class="docutils literal notranslate"><span class="pre">COCOWaypointActionsCfg</span></code></p></li>
+</ul>
+</section>
+<section id="integration-hook">
+<h3>Integration Hook<a class="headerlink" href="#integration-hook" title="Permalink to this heading">#</a></h3>
+<p>The <cite>COCONavModifyEnv</cite> function is provided to modify the scene and termination logic to match the COCO robot configuration.</p>
+<ul class="simple">
+<li><p>Adjusts sensor locations</p></li>
+<li><p>Overrides termination collision parameters</p></li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">COCONavModifyEnv</span><span class="p">(</span><span class="n">env</span><span class="p">):</span>
+    <span class="n">env</span><span class="o">.</span><span class="n">scene</span><span class="o">.</span><span class="n">camera</span><span class="o">.</span><span class="n">prim_path</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{ENV_REGEX_NS}</span><span class="s2">/Robot/base_link/front_cam&quot;</span>
+    <span class="n">env</span><span class="o">.</span><span class="n">terminations</span><span class="o">.</span><span class="n">collision</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="s2">&quot;sensor_cfg&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">body_names</span> <span class="o">=</span> <span class="s2">&quot;body_link&quot;</span>
+    <span class="k">return</span> <span class="n">env</span>
+</pre></div>
+</div>
+</section>
+<section id="id1">
+<h3>Takeaway<a class="headerlink" href="#id1" title="Permalink to this heading">#</a></h3>
+<p>The robot module is <strong>robot-centric</strong>, separating hardware specs (URDF, actuators, joint names) from policy logic.
+This decoupling allows different robots to plug into the same training scene and share task logic (e.g., rewards, observations).</p>
+</section>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="learning.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Learning Module</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="scene.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">UrbanScene: Scenario Construction</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#navigation-random-env-cfg-py">Navigation: random_env_cfg.py</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#scene-configuration-scenecfg">Scene Configuration (SceneCfg)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#mdp-components">MDP Components</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#integration">Integration</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#takeaway">Takeaway</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#robot">Robot</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#robot-configuration">Robot Configuration</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#action-space-1-velocity-angular-commands">Action Space 1: Velocity + Angular Commands</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#action-space-2-waypoint-based-commands">Action Space 2: Waypoint-based Commands</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#integration-hook">Integration Hook</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#id1">Takeaway</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Honglin He
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2025-2030, The URBAN-SIM Project Developers. [URBAN-SIM is built upon NVIDIA Isaac Sim&amp;Lab and extends its capabilities for urban robot learning tasks].
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    <p class="last-updated">
+  Last updated on Jul 04, 2025.
+  <br/>
+</p>
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>
