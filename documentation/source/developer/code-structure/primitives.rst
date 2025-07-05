@@ -162,6 +162,25 @@ The `COCONavModifyEnv` function is provided to modify the scene and termination 
        env.terminations.collision.params["sensor_cfg"].body_names = "body_link"
        return env
 
+
+While the `COCO` robot is the default example used in our navigation and locomotion tasks, we understand that many users may work with other platforms.  
+To facilitate this, we also provide two additional robot configurations out of the box:
+
+- `go2.py`: Unitree Go2 robot configuration (quadruped locomotion)
+- `g1.py`: Unitree G1 robot configuration (humanoid locomotion)
+- `anymal_c.py`: ANYmal C robot configuration (quadruped locomotion)
+
+These files follow the same structure and conventions as `coco.py`, making it easy to reuse task logic across different platforms.
+
+If you wish to add support for a new robot:
+
+1. **Create a new config file** under `urbansim/primitives/robot/`, e.g., `myrobot.py`.
+2. **Define its articulation config**, including URDF path, actuators, and initial state.
+3. **Implement or reuse** an action space class that suits your control interface (e.g., velocity-based, waypoint-based, joint command).
+4. **(Optional)** Provide a `ModifyEnv` function to adjust sensor placements, terminations, or robot-specific resets.
+5. **Register** your robot into the environment configuration (e.g., `random_env_cfg.py`) or pass it dynamically at runtime.
+
+
 Takeaway
 ~~~~~~~~
 

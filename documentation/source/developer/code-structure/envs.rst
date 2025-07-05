@@ -7,7 +7,9 @@ These classes wrap around the simulation backend and manager-based modular desig
 Overview
 --------
 
-### Core Files
+
+Core Files
+~~~~~~~~~~
 
 - `abstract_env.py`  
   Defines the `AbstractEnv` class, a base class that wraps around `ManagerBasedEnv`. It handles:
@@ -43,10 +45,8 @@ Overview
 The hierarchy is:
 
 - `ManagerBasedRLEnv` (from IsaacLab)  
-   ⬇  
-- `AbstractRLEnv` (URBAN-SIM RL base class)  
-   ⬇  
-- `PGEnv`, `PredefinedEnv`, etc. (concrete tasks)
+  - `AbstractRLEnv` (URBAN-SIM RL base class)  
+    - `PGEnv`, `PredefinedEnv`, etc. (concrete tasks)
 
 Workflow Summary
 -----------------
