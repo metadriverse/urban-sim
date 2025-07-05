@@ -10,7 +10,7 @@
 
 <div style="text-align: center; margin: 1em auto; max-width: 90%; word-wrap: break-word;">
   <strong>
-    [ <a href="https://metadriverse.github.io/urban-sim/">Website</a> |
+    [ <a href="https://metadriverse.github.io/urbansim/">Website</a> |
     <a href="https://metadriverse.github.io/urban-sim/docs">Documentation</a> |
     <a href="https://arxiv.org/pdf/2505.00690.pdf">Paper</a> |
     <a href="https://metadriverse.github.io/">Relevant Projects</a> ]
