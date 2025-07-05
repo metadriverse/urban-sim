@@ -1,12 +1,12 @@
 # Towards Autonomous Micromobility through Scalable Urban Simulation
 
-[![Static Badge](https://img.shields.io/badge/URBANSIM-arxiv-blue)](https://arxiv.org/pdf/2505.00690.pdf)
-[![GitHub license](https://img.shields.io/github/license/metadriverse/urban-sim)](https://github.com/metadriverse/urban-sim/blob/main/LICENSE.txt)
-[![GitHub contributors](https://img.shields.io/github/contributors/metadriverse/urban-sim)](https://github.com/metadriverse/urban-sim/graphs/contributors)
-
 <p align="center">
   <img src="documentation/assets/teaser.gif" alt="Urban-Sim Teaser"  width="640">
 </p>
+
+[![Static Badge](https://img.shields.io/badge/URBANSIM-arxiv-blue)](https://arxiv.org/pdf/2505.00690.pdf)
+[![GitHub license](https://img.shields.io/github/license/metadriverse/urban-sim)](https://github.com/metadriverse/urban-sim/blob/main/LICENSE.txt)
+[![GitHub contributors](https://img.shields.io/github/contributors/metadriverse/urban-sim)](https://github.com/metadriverse/urban-sim/graphs/contributors)
 
 <div style="text-align: center; margin: 1em auto; max-width: 90%; word-wrap: break-word;">
   <strong>
