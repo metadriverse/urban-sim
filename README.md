@@ -8,19 +8,15 @@
   <img src="documentation/assets/teaser.gif" alt="Urban-Sim Teaser"  width="640">
 </p>
 
-<div style="text-align: center; width:100%; margin: 0 auto; display: inline-block">
-<strong>
-[
-<a href="https://metadriverse.github.io/urban-sim/">Website</a>
-|
-<a href="https://metadriverse.github.io/urban-sim/docs">Documentation</a>
-|
-<a href="https://arxiv.org/pdf/2505.00690.pdf">Paper</a>
-|
-<a href="https://metadriverse.github.io/">Relevant Projects</a>
-]
-</strong>
+<div style="text-align: center; margin: 1em auto; max-width: 90%; word-wrap: break-word;">
+  <strong>
+    [ <a href="https://metadriverse.github.io/urban-sim/">Website</a> |
+    <a href="https://metadriverse.github.io/urban-sim/docs">Documentation</a> |
+    <a href="https://arxiv.org/pdf/2505.00690.pdf">Paper</a> |
+    <a href="https://metadriverse.github.io/">Relevant Projects</a> ]
+  </strong>
 </div>
+
 
 ## Latest Updates
 - [Jul/05/2025] **v0.1.0**: The first official release of URBAN-SIM.
