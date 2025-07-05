@@ -13,7 +13,7 @@
 [
 <a href="https://metadriverse.github.io/urban-sim/">Website</a>
 |
-<a href="https://metadriverse.github.io/urban-sim/">Documentation</a>
+<a href="https://metadriverse.github.io/urban-sim/docs">Documentation</a>
 |
 <a href="https://arxiv.org/pdf/2505.00690.pdf">Paper</a>
 |
@@ -23,7 +23,7 @@
 </div>
 
 ## Latest Updates
-- [Jul/05/2025] **v0.0.1**: The first official release of URBAN-SIM.
+- [Jul/05/2025] **v0.1.0**: The first official release of URBAN-SIM.
 
 ## Table of Contents
 - [URBANSIM](#-towards-autonomous-micromobility-through-scalable-urban-simulation)
@@ -163,6 +163,7 @@ Can't find the answer to your question? Try posting issues or asking the develop
 ## 📌 TODOs
 - [ ] Curated asset and scenarios for better rendering.
 - [ ] Release checkpoints for more robots (Booster T1, Unitree G1, ...)
+- [ ] Release reactive environmental agents via ORCA -> IDM-JAX.
 - [ ] Release useful scripts for downstream tasks such as data generation for imitation learning, instance/appearance randomization for reinforcement learning.
 - [ ] Lightweight pipeline for scenario & environment generation.
 
