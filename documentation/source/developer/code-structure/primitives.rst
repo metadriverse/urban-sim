@@ -163,7 +163,7 @@ The `COCONavModifyEnv` function is provided to modify the scene and termination 
        return env
 
 
-While the `COCO` robot is the default example used in our navigation and locomotion tasks, we understand that many users may work with other platforms.  
+While the `COCO` robot is the default example used in our tasks, we understand that many users may work with other platforms.  
 To facilitate this, we also provide two additional robot configurations out of the box:
 
 - `go2.py`: Unitree Go2 robot configuration (quadruped locomotion)
