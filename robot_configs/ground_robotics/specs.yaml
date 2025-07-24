@@ -1,0 +1,157 @@
+# Ground Robotics Autonomous Lawn Mower - Hardware Specifications
+# Note: These are placeholder values - replace with actual hardware specs
+
+robot_info:
+  manufacturer: "Ground Robotics"
+  model: "Autonomous Lawn Mower"
+  version: "1.0"
+  serial: "GR-ALM-001"
+
+physical_properties:
+  total_mass: 45.0  # kg
+  dimensions:
+    length: 1.2  # m
+    width: 0.8   # m
+    height: 0.6  # m
+  center_of_mass: [0.0, 0.0, 0.3]  # m from base_link
+  moment_of_inertia: [2.5, 4.2, 4.8]  # kg*m^2 [Ixx, Iyy, Izz]
+
+# Motion capabilities
+max_velocity: 2.0      # m/s
+max_acceleration: 1.0  # m/s^2
+max_angular_velocity: 1.5  # rad/s
+max_angular_acceleration: 2.0  # rad/s^2
+
+# Sensor specifications
+sensors:
+  lidar_primary:
+    manufacturer: "Velodyne"
+    model: "VLP-16"
+    specifications:
+      range_min: 0.3  # m
+      range_max: 100.0  # m
+      angular_resolution: 0.2  # degrees
+      scan_rate: 10.0  # Hz
+      accuracy: 0.03  # m
+    mounting:
+      position: [0.0, 0.0, 0.5]  # m from base_link
+      orientation: [0.0, 0.0, 0.0]  # roll, pitch, yaw (radians)
+      
+  ultrasonic_array:
+    manufacturer: "MaxBotix"
+    model: "MB1240"
+    count: 8
+    specifications:
+      range_min: 0.2  # m
+      range_max: 3.0  # m
+      beam_angle: 15.0  # degrees
+      update_rate: 20.0  # Hz
+    mounting:
+      # 8 sensors around perimeter
+      positions: [
+        [0.6, 0.0, 0.2],    # front
+        [0.4, 0.4, 0.2],    # front-right
+        [0.0, 0.4, 0.2],    # right
+        [-0.4, 0.4, 0.2],   # rear-right
+        [-0.6, 0.0, 0.2],   # rear
+        [-0.4, -0.4, 0.2],  # rear-left
+        [0.0, -0.4, 0.2],   # left
+        [0.4, -0.4, 0.2]    # front-left
+      ]
+      
+  cliff_sensors:
+    manufacturer: "Sharp"
+    model: "GP2Y0A21YK0F"
+    count: 4
+    specifications:
+      range_min: 0.05  # m
+      range_max: 0.8   # m
+      update_rate: 50.0  # Hz
+    mounting:
+      # 4 sensors at corners for cliff detection
+      positions: [
+        [0.5, 0.3, 0.1],   # front-right
+        [0.5, -0.3, 0.1],  # front-left
+        [-0.3, 0.3, 0.1],  # rear-right
+        [-0.3, -0.3, 0.1]  # rear-left
+      ]
+      
+  cameras:
+    front_camera:
+      manufacturer: "Intel"
+      model: "RealSense D435i"
+      specifications:
+        resolution: [1920, 1080]
+        fps: 30.0
+        fov: [69.4, 42.5]  # horizontal, vertical degrees
+      mounting:
+        position: [0.6, 0.0, 0.3]
+        orientation: [0.0, 0.0, 0.0]
+
+# Actuator specifications
+actuators:
+  drive_motors:
+    manufacturer: "Maxon"
+    model: "EC-i 40"
+    count: 2  # differential drive
+    specifications:
+      continuous_torque: 50.0  # Nm
+      peak_torque: 150.0       # Nm
+      max_rpm: 400             # rpm
+      encoder_resolution: 4096  # counts/rev
+      gear_ratio: 20.0
+    mounting:
+      positions: [
+        [0.0, 0.4, 0.2],   # left wheel
+        [0.0, -0.4, 0.2]   # right wheel
+      ]
+      
+  blade_motor:
+    manufacturer: "Briggs & Stratton"
+    model: "1450 Series"
+    specifications:
+      power: 1500.0      # Watts
+      operating_rpm: 3600 # rpm
+      torque: 4.0        # Nm
+      safety_clutch_torque: 6.0  # Nm (slip threshold)
+    mounting:
+      position: [0.0, 0.0, -0.1]  # under deck
+      
+# Safety systems
+safety_systems:
+  emergency_stop:
+    type: "hardware_button"
+    response_time: 0.05  # seconds
+    
+  lift_detection:
+    type: "tilt_sensor"
+    threshold: 30.0  # degrees
+    response_time: 0.1  # seconds
+    
+  collision_avoidance:
+    enable_zones: true
+    detection_zone: 2.0  # meters
+    warning_zone: 1.0    # meters
+    stop_zone: 0.5       # meters
+    
+  blade_safety:
+    auto_stop_on_lift: true
+    auto_stop_on_tilt: true
+    max_tilt_angle: 20.0  # degrees
+    
+# Operating limits
+operating_limits:
+  max_slope: 20.0        # degrees
+  min_ground_clearance: 0.05  # meters
+  max_cutting_height: 0.1     # meters
+  min_cutting_height: 0.02    # meters
+  
+# Communication
+communication:
+  wifi:
+    standard: "802.11ac"
+    range: 100.0  # meters
+  
+  emergency_comms:
+    type: "cellular"
+    backup: true
